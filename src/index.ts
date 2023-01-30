@@ -105,17 +105,25 @@ function backPropagate(params: BackpropParams) {
   // dimensions of a2 (when transposed) are (rows, cols): [OUTPUT_SIZE, 1]
   const dZ2 = a2.map((v, i) => v - expected[i]);
   // how much does each weight (connecting a hidden node to an output node) contribute to the error
-  // dimensions of dW2 are (rows, cols): [OUTPUT_SIZE, HIDDEN_SIZE]
+  // dimensions of dZ2 (when transposed) are (rows, cols): [OUTPUT_SIZE, 1]
+  // dimensions of a1 (when transposed) are (rows, cols): [1, HIDDEN_SIZE]
+  // in matmul, because the dimensions are multiplier's rows * multiplicand's cols,
+  // the result is [OUTPUT_SIZE, HIDDEN_SIZE], which is what we expect:
+  // each output node (10) has a weight for each hidden node (16)
   const dW2 = matrixMultiply(matrixTranspose([dZ2]), matrixTranspose(a1)).map(
     (arr) => arr.map((v) => v / m)
   );
+
   // bias for the output nodes is simply the average error
   const dB2 = dZ2.map((v) => v / m);
   // Get the error for each hidden node
-  // dimensions of weights2 are (rows, cols): [OUTPUT_SIZE, HIDDEN_SIZE]
-  // dimensions of dZ2 are (rows, cols): [OUTPUT_SIZE, 1]
-  // dimensions of z1 are (rows, cols): [HIDDEN_SIZE, 1]
-  // dimensions of dZ1 are (rows, cols): [HIDDEN_SIZE, 1]
+  // dimensions of weights2 when transposed are (rows, cols): [HIDDEN_SIZE, OUTPUT_SIZE]
+  // dimensions of dZ2 when transposed are (rows, cols): [1, OUTPUT_SIZE]
+  // in matmul, because the dimensions are multiplier's rows * multiplicand's cols,
+  // the result is [HIDDEN_SIZE, 1], which is what we expect:
+  // dimensions of z1 are (rows, cols): [HIDDEN_SIZE, 1], as each hidden node (16) has a
+  // single "unactivated" value
+  // the delta vector dZ1 dimensions are naturally also (rows, cols): [HIDDEN_SIZE, 1]
   const dZ1 = matrixMultiply(
     matrixTranspose(weights2),
     matrixTranspose([dZ2])
