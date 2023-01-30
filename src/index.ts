@@ -11,8 +11,8 @@ type Network = {
   params: {
     weights1: number[][];
     weights2: number[][];
-    biases1: number[];
-    biases2: number[];
+    biases1: number[][];
+    biases2: number[][];
   };
   accuracy: number;
 };
@@ -40,11 +40,11 @@ function createNetwork(): Network {
 
   const biases1 = Array(HIDDEN_SIZE)
     .fill(0)
-    .map(() => Math.random() * 2 - 1);
+    .map(() => [Math.random() * 2 - 1]);
 
   const biases2 = Array(OUTPUT_SIZE)
     .fill(0)
-    .map(() => Math.random() * 2 - 1);
+    .map(() => [Math.random() * 2 - 1]);
 
   return {
     params: {
@@ -57,30 +57,34 @@ function createNetwork(): Network {
   };
 }
 
-function forwardPropagate(
-  input: number[],
-  params: {
-    weights1: number[][];
-    weights2: number[][];
-    biases1: number[];
-    biases2: number[];
-  }
-) {
+function forwardPropagate(input: number[], params: Network["params"]) {
   const { weights1, weights2, biases1, biases2 } = params;
 
-  // weights1 matrix dimensions are [HIDDEN_SIZE, INPUT_SIZE]
-  // input vector dimensions are [INPUT_SIZE, 1] so we need to transpose it
+  // weights1 matrix dimensions (rows, cols) are [HIDDEN_SIZE, INPUT_SIZE]
+  // input vector dimensions are [1, INPUT_SIZE] so we need to transpose it to [INPUT_SIZE, 1]
+  // in matmul, the dimensions of the result are multiplier's rows and multiplicand's cols,
+  // so the dimensions of z1 are [HIDDEN_SIZE, 1], which is what we expect:
+  // each hidden node has a single output
   const transposedInput = matrixTranspose([input]);
-  const z1 = matrixMultiply(weights1, transposedInput).map((arr) =>
-    arr.map((v, i) => v + biases1[i])
+  const z1 = matrixMultiply(weights1, transposedInput).map((arr, i) =>
+    arr.map((v) => v + biases1[i][0])
   );
-  const a1 = z1.map((arr) => arr.map((v) => relu(v)));
+  // run the hidden layer through the activation function to get some nonlinearity up in this motha
+  // a1 is the output of the hidden layer, so it has the same dimensions as z1
+  const a1 = z1.map((arr) => arr.map(relu));
 
-  const z2 = matrixMultiply(weights2, a1).map((arr) =>
-    arr.map((v, i) => v + biases2[i])
+  // weights2 matrix dimensions (rows, cols) are [OUTPUT_SIZE, HIDDEN_SIZE]
+  // a1 vector dimensions are [HIDDEN_SIZE, 1]
+  // in matmul, the dimensions of the result are multiplier's rows and multiplicand's cols,
+  // so the dimensions of z2 are [OUTPUT_SIZE, 1], which is what we expect:
+  // each output node has a single output
+  const z2 = matrixMultiply(weights2, a1).map((arr, i) =>
+    arr.map((v) => v + biases2[i][0])
   );
 
-  const a2 = z2.map((arr) => arr[0]).map((v) => sigmoid(v));
+  // run the output layer through the activation function to get some nonlinearity up in this motha
+  // sigmoid clamps the output between 0 and 1, which is what we want for a probability
+  const a2 = z2.map((arr) => arr.map((v) => sigmoid(v)));
 
   return {
     a1,
@@ -102,36 +106,34 @@ function backPropagate(params: BackpropParams) {
   // the output layer has 'm' numbers (in this case 10)
   const m = expected.length;
   // Get the error for each output
-  // dimensions of a2 (when transposed) are (rows, cols): [OUTPUT_SIZE, 1]
-  const dZ2 = a2.map((v, i) => v - expected[i]);
+  // dimensions of a2 are (rows, cols): [OUTPUT_SIZE, 1]
+  const dZ2 = a2.map((arr, i) => arr.map((v) => v - expected[i]));
   // how much does each weight (connecting a hidden node to an output node) contribute to the error
-  // dimensions of dZ2 (when transposed) are (rows, cols): [OUTPUT_SIZE, 1]
-  // dimensions of a1 (when transposed) are (rows, cols): [1, HIDDEN_SIZE]
+  // dimensions of dZ2 are (rows, cols): [OUTPUT_SIZE, 1]
+  // dimensions of a1 are [HIDDEN_SIZE, 1] so we need to transpose it to [1, HIDDEN_SIZE]
   // in matmul, because the dimensions are multiplier's rows * multiplicand's cols,
   // the result is [OUTPUT_SIZE, HIDDEN_SIZE], which is what we expect:
   // each output node (10) has a weight for each hidden node (16)
-  const dW2 = matrixMultiply(matrixTranspose([dZ2]), matrixTranspose(a1)).map(
-    (arr) => arr.map((v) => v / m)
+  const dW2 = matrixMultiply(dZ2, matrixTranspose(a1)).map((arr) =>
+    arr.map((v) => v / m)
   );
 
-  // bias for the output nodes is simply the average error
-  const dB2 = dZ2.map((v) => v / m);
+  // bias for the output nodes is simply the error for that node
+  const dB2 = dZ2.map((arr) => arr.map((v) => v / m));
   // Get the error for each hidden node
   // dimensions of weights2 when transposed are (rows, cols): [HIDDEN_SIZE, OUTPUT_SIZE]
-  // dimensions of dZ2 when transposed are (rows, cols): [1, OUTPUT_SIZE]
+  // dimensions of dZ2 are (rows, cols): [OUTPUT_SIZE, 1]
   // in matmul, because the dimensions are multiplier's rows * multiplicand's cols,
-  // the result is [HIDDEN_SIZE, 1], which is what we expect:
-  // dimensions of z1 are (rows, cols): [HIDDEN_SIZE, 1], as each hidden node (16) has a
-  // single "unactivated" value
-  // the delta vector dZ1 dimensions are naturally also (rows, cols): [HIDDEN_SIZE, 1]
-  const dZ1 = matrixMultiply(
-    matrixTranspose(weights2),
-    matrixTranspose([dZ2])
-  ).map((arr) => arr.map((v, i) => v * reluDerivative(z1[i][0])));
+  // the result, dZ1, is [HIDDEN_SIZE, 1], which is what we expect:
+  // each hidden node (16) has a single delta for each of its outputs;
+  // the z1 output dimensions are naturally also [HIDDEN_SIZE, 1]
+  const dZ1 = matrixMultiply(matrixTranspose(weights2), dZ2).map((arr, i) =>
+    arr.map((v) => v * reluDerivative(z1[i][0]))
+  );
   // how much does each weight (connecting an input node to a hidden node) contribute to the error
   const dW1 = matrixMultiply(dZ1, [input]).map((arr) => arr.map((v) => v / m));
-  // bias for the hidden nodes is simply the average error
-  const dB1 = dZ1.map((arr) => arr[0] / m);
+  // bias for the hidden nodes is simply the activation error for that node
+  const dB1 = dZ1.map((arr) => arr.map((v) => v / m));
 
   return {
     dW1,
@@ -157,8 +159,8 @@ function updateWeightsAndBiases(
   const newWeights2 = weights2.map((arr, i) =>
     arr.map((v, j) => v - learningRate * dW2[i][j])
   );
-  const newBiases1 = biases1.map((v, i) => v - learningRate * dB1[i]);
-  const newBiases2 = biases2.map((v, i) => v - learningRate * dB2[i]);
+  const newBiases1 = biases1.map((v, i) => [v[0] - learningRate * dB1[i][0]]);
+  const newBiases2 = biases2.map((v, i) => [v[0] - learningRate * dB2[i][0]]);
 
   params.weights1 = newWeights1;
   params.weights2 = newWeights2;
@@ -175,7 +177,8 @@ function getAccuracy(
 ) {
   const correct = test.reduce((acc, { input, output }) => {
     const { a2 } = forwardPropagate(input, params);
-    const prediction = a2.indexOf(Math.max(...a2));
+    const a2transpose = a2.map((arr) => arr[0]);
+    const prediction = a2transpose.indexOf(Math.max(...a2transpose));
     const actual = output.indexOf(Math.max(...output));
     return prediction === actual ? acc + 1 : acc;
   }, 0);
@@ -290,7 +293,8 @@ if (command === "train") {
   let correct = 0;
   samples.forEach(({ input, output }) => {
     const { a2 } = forwardPropagate(input, model.params);
-    const prediction = a2.indexOf(Math.max(...a2));
+    const a2transpose = a2.map((arr) => arr[0]);
+    const prediction = a2transpose.indexOf(Math.max(...a2transpose));
     const actual = (output as number[]).indexOf(Math.max(...output));
     console.log(`Prediction: ${prediction} Actual: ${actual}`);
     if (prediction === actual) correct++;
