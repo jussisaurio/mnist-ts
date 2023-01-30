@@ -7,12 +7,18 @@ import { relu, reluDerivative, sigmoid } from "./activation";
 const train = mnistTrainingSet;
 const test = mnistTestSet;
 
+type ColumnVector = [number][];
+
+const checkColumnVector = (v: number[][]): v is ColumnVector => {
+  return v.every((row) => row.length === 1 && typeof row[0] === "number");
+};
+
 type Network = {
   params: {
     weights1: number[][];
     weights2: number[][];
-    biases1: number[][];
-    biases2: number[][];
+    biases1: ColumnVector;
+    biases2: ColumnVector;
   };
   accuracy: number;
 };
@@ -45,6 +51,14 @@ function createNetwork(): Network {
   const biases2 = Array(OUTPUT_SIZE)
     .fill(0)
     .map(() => [Math.random() * 2 - 1]);
+
+  if (!checkColumnVector(biases1)) {
+    throw new Error("biases1 is not a column vector");
+  }
+
+  if (!checkColumnVector(biases2)) {
+    throw new Error("biases2 is not a column vector");
+  }
 
   return {
     params: {
@@ -108,6 +122,9 @@ function backPropagate(params: BackpropParams) {
   // Get the error for each output
   // dimensions of a2 are (rows, cols): [OUTPUT_SIZE, 1]
   const dZ2 = a2.map((arr, i) => arr.map((v) => v - expected[i]));
+  if (!checkColumnVector(dZ2)) {
+    throw new Error("dZ2 is not a column vector");
+  }
   // how much does each weight (connecting a hidden node to an output node) contribute to the error
   // dimensions of dZ2 are (rows, cols): [OUTPUT_SIZE, 1]
   // dimensions of a1 are [HIDDEN_SIZE, 1] so we need to transpose it to [1, HIDDEN_SIZE]
@@ -120,6 +137,9 @@ function backPropagate(params: BackpropParams) {
 
   // bias for the output nodes is simply the error for that node
   const dB2 = dZ2.map((arr) => arr.map((v) => v / m));
+  if (!checkColumnVector(dB2)) {
+    throw new Error("dB2 is not a column vector");
+  }
   // Get the error for each hidden node
   // dimensions of weights2 when transposed are (rows, cols): [HIDDEN_SIZE, OUTPUT_SIZE]
   // dimensions of dZ2 are (rows, cols): [OUTPUT_SIZE, 1]
@@ -130,10 +150,16 @@ function backPropagate(params: BackpropParams) {
   const dZ1 = matrixMultiply(matrixTranspose(weights2), dZ2).map((arr, i) =>
     arr.map((v) => v * reluDerivative(z1[i][0]))
   );
+  if (!checkColumnVector(dZ1)) {
+    throw new Error("dZ1 is not a column vector");
+  }
   // how much does each weight (connecting an input node to a hidden node) contribute to the error
   const dW1 = matrixMultiply(dZ1, [input]).map((arr) => arr.map((v) => v / m));
   // bias for the hidden nodes is simply the activation error for that node
   const dB1 = dZ1.map((arr) => arr.map((v) => v / m));
+  if (!checkColumnVector(dB1)) {
+    throw new Error("dB1 is not a column vector");
+  }
 
   return {
     dW1,
@@ -161,6 +187,11 @@ function updateWeightsAndBiases(
   );
   const newBiases1 = biases1.map((v, i) => [v[0] - learningRate * dB1[i][0]]);
   const newBiases2 = biases2.map((v, i) => [v[0] - learningRate * dB2[i][0]]);
+
+  if (!checkColumnVector(newBiases1))
+    throw new Error("newBiases1 is not a column vector");
+  if (!checkColumnVector(newBiases2))
+    throw new Error("newBiases2 is not a column vector");
 
   params.weights1 = newWeights1;
   params.weights2 = newWeights2;
