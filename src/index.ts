@@ -240,7 +240,9 @@ function gradientDescent(props: GradientDescentParams) {
 
     const accuracy = getAccuracy(getRandomSample(testData, 100), model.params);
 
-    console.log(`Epoch ${i + 1} accuracy: ${accuracy}`);
+    console.log(
+      `Epoch ${i + 1} accuracy on a random 100 image sample: ${accuracy}`
+    );
   }
 
   return {
