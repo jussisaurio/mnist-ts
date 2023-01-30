@@ -1,0 +1,3 @@
+node_modules
+src/dataset/mnist_test.csv
+src/dataset/mnist_train.csv
