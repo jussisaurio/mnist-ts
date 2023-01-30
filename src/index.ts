@@ -88,6 +88,9 @@ function forwardPropagate(input: number[], params: Network["params"]) {
   // run the hidden layer through the activation function to get some nonlinearity up in this motha
   // a1 is the output of the hidden layer, so it has the same dimensions as z1
   const a1 = z1.map((arr) => arr.map(relu));
+  if (!checkColumnVector(a1)) {
+    throw new Error("a1 is not a column vector");
+  }
 
   // weights2 matrix dimensions (rows, cols) are [OUTPUT_SIZE, HIDDEN_SIZE]
   // a1 vector dimensions are [HIDDEN_SIZE, 1]
@@ -101,6 +104,10 @@ function forwardPropagate(input: number[], params: Network["params"]) {
   // run the output layer through the activation function to get some nonlinearity up in this motha
   // sigmoid clamps the output between 0 and 1, which is what we want for a probability
   const a2 = z2.map((arr) => arr.map((v) => sigmoid(v)));
+
+  if (!checkColumnVector(a2)) {
+    throw new Error("a2 is not a column vector");
+  }
 
   return {
     a1,
