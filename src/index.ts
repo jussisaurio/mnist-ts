@@ -215,7 +215,6 @@ function gradientDescent(props: GradientDescentParams) {
       >)
     : createNetwork();
   const { learningRate, epochs, trainingData, testData } = props;
-  const testsample = getRandomSample(testData, 100);
 
   for (let i = 0; i < epochs; i++) {
     const trainingsample = getRandomSample(trainingData, 1000);
@@ -239,7 +238,7 @@ function gradientDescent(props: GradientDescentParams) {
       );
     }
 
-    const accuracy = getAccuracy(testsample, model.params);
+    const accuracy = getAccuracy(testData, model.params);
 
     console.log(`Epoch ${i + 1} accuracy: ${accuracy}`);
   }
