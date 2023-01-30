@@ -238,7 +238,7 @@ function gradientDescent(props: GradientDescentParams) {
       );
     }
 
-    const accuracy = getAccuracy(testData, model.params);
+    const accuracy = getAccuracy(getRandomSample(testData, 100), model.params);
 
     console.log(`Epoch ${i + 1} accuracy: ${accuracy}`);
   }
@@ -252,8 +252,8 @@ function gradientDescent(props: GradientDescentParams) {
 const command = process.argv[2];
 
 if (command === "train") {
-  const epochs = parseInt(process.argv[3], 10) || 1000;
-  const learningRate = parseFloat(process.argv[4]) || 0.1;
+  const epochs = parseInt(process.argv[3], 10) || 100;
+  const learningRate = parseFloat(process.argv[4]) || 0.01;
   const finishedModel = gradientDescent({
     learningRate,
     epochs,
