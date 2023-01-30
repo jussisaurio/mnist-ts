@@ -10,7 +10,9 @@ const test = mnistTestSet;
 type ColumnVector = [number][];
 
 const checkColumnVector = (v: number[][]): v is ColumnVector => {
-  return v.every((row) => row.length === 1 && typeof row[0] === "number");
+  return process.env.NODE_ENV === "production"
+    ? true
+    : v.every((row) => row.length === 1 && typeof row[0] === "number");
 };
 
 type Network = {
