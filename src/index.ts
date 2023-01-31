@@ -127,8 +127,6 @@ type BackpropParams = ReturnType<typeof forwardPropagate> & {
 function backPropagate(params: BackpropParams) {
   const { a1, a2, z1, z2, input, weights2, expected } = params;
 
-  // the output layer has 'm' numbers (in this case 10)
-  const m = expected.length;
   // Get the error for each output
   // dimensions of a2 are (rows, cols): [OUTPUT_SIZE, 1]
   // We are implicitly using cross-entropy loss with softmax here,
