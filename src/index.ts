@@ -2,7 +2,7 @@ import { mnistTestSet, mnistTrainingSet } from "./dataset/parseDataset";
 
 import * as fs from "fs";
 import { matrixMultiply, matrixTranspose } from "./matrix";
-import { relu, reluDerivative, sigmoid } from "./activation";
+import { relu, reluDerivative, softmax } from "./activation";
 
 const train = mnistTrainingSet;
 const test = mnistTestSet;
@@ -102,8 +102,9 @@ function forwardPropagate(input: number[], params: Network["params"]) {
   );
 
   // run the output layer through the activation function to get some nonlinearity up in this motha
-  // sigmoid clamps the output between 0 and 1, which is what we want for a probability
-  const a2 = z2.map((arr) => arr.map((v) => sigmoid(v)));
+  // the sum of the softmax values should be 1, so we can use it as a probability distribution
+  const z2Vector = z2.map((arr) => arr[0]);
+  const a2 = matrixTranspose([softmax(z2Vector)]);
 
   if (!checkColumnVector(a2)) {
     throw new Error("a2 is not a column vector");
