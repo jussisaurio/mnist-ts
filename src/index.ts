@@ -131,6 +131,8 @@ function backPropagate(params: BackpropParams) {
   const m = expected.length;
   // Get the error for each output
   // dimensions of a2 are (rows, cols): [OUTPUT_SIZE, 1]
+  // We are implicitly using cross-entropy loss with softmax here,
+  // which means the derivative of the loss with respect to the output is just the difference between the expected and actual output
   const dZ2 = a2.map((arr, i) => arr.map((v) => v - expected[i]));
   if (!checkColumnVector(dZ2)) {
     throw new Error("dZ2 is not a column vector");
@@ -141,12 +143,15 @@ function backPropagate(params: BackpropParams) {
   // in matmul, because the dimensions are multiplier's rows * multiplicand's cols,
   // the result is [OUTPUT_SIZE, HIDDEN_SIZE], which is what we expect:
   // each output node (10) has a weight for each hidden node (16)
-  const dW2 = matrixMultiply(dZ2, matrixTranspose(a1)).map(
-    (arr) => arr.map((v) => v / m) // todo this doesn't make sense, it's just randomly there
-  );
+
+  // We are implicitly using cross-entropy loss with softmax here,
+  // which means the derivative of the loss with respect to the weight is just
+  // (output - expected) * previous layer's output
+  // From: http://www.adeveloperdiary.com/data-science/deep-learning/neural-network-with-softmax-in-python/
+  const dW2 = matrixMultiply(dZ2, matrixTranspose(a1));
 
   // bias for the output nodes is simply the error for that node
-  const dB2 = dZ2.map((arr) => arr.map((v) => v / m));
+  const dB2 = dZ2;
   if (!checkColumnVector(dB2)) {
     throw new Error("dB2 is not a column vector");
   }
@@ -164,9 +169,9 @@ function backPropagate(params: BackpropParams) {
     throw new Error("dZ1 is not a column vector");
   }
   // how much does each weight (connecting an input node to a hidden node) contribute to the error
-  const dW1 = matrixMultiply(dZ1, [input]).map((arr) => arr.map((v) => v / m));
+  const dW1 = matrixMultiply(dZ1, [input]);
   // bias for the hidden nodes is simply the activation error for that node
-  const dB1 = dZ1.map((arr) => arr.map((v) => v / m));
+  const dB1 = dZ1;
   if (!checkColumnVector(dB1)) {
     throw new Error("dB1 is not a column vector");
   }
