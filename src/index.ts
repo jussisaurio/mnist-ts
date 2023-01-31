@@ -141,8 +141,8 @@ function backPropagate(params: BackpropParams) {
   // in matmul, because the dimensions are multiplier's rows * multiplicand's cols,
   // the result is [OUTPUT_SIZE, HIDDEN_SIZE], which is what we expect:
   // each output node (10) has a weight for each hidden node (16)
-  const dW2 = matrixMultiply(dZ2, matrixTranspose(a1)).map((arr) =>
-    arr.map((v) => v / m)
+  const dW2 = matrixMultiply(dZ2, matrixTranspose(a1)).map(
+    (arr) => arr.map((v) => v / m) // todo this doesn't make sense, it's just randomly there
   );
 
   // bias for the output nodes is simply the error for that node
