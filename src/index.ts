@@ -125,7 +125,7 @@ type BackpropParams = ReturnType<typeof forwardPropagate> & {
 };
 
 function backPropagate(params: BackpropParams) {
-  const { a1, a2, z1, z2, input, weights2, expected } = params;
+  const { a1, a2, z1, input, weights2, expected } = params;
 
   // a0, i.e. input activation is just the input vector
   const a0 = [input];
@@ -137,7 +137,7 @@ function backPropagate(params: BackpropParams) {
 
   // We are implicitly using cross-entropy loss with softmax here:
   // L = -∑expected * log(a2), where a2 is the actual output:
-  // a2 = softmax(w2 * z2)
+  // a2 = softmax(w2 * z2 + b2)
   // From this can be derived that the derivative of the loss with respect to the unactivated output of the output layer is just a2 - expected,
   // explained here: http://www.adeveloperdiary.com/data-science/deep-learning/neural-network-with-softmax-in-python/
   // So, how much does the loss change when we change the unactivated output?
