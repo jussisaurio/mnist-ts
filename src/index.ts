@@ -140,14 +140,14 @@ function backPropagate(params: BackpropParams) {
   // a2 = softmax(w2 * z2)
   // which means the derivative of the loss with respect to the unactivated output is just the difference between the expected and actual output,
   // explained here: http://www.adeveloperdiary.com/data-science/deep-learning/neural-network-with-softmax-in-python/
-  //
+  // So, how much does the loss change when we change the unactivated output?
   // dL/dZ2 = a2 - expected
   const dZ2 = a2.map((arr, i) => arr.map((v) => v - expected[i]));
   if (!checkColumnVector(dZ2)) {
     throw new Error("dZ2 is not a column vector");
   }
 
-  // How much does each weight (connecting a hidden node to an output node) contribute to the loss?
+  // How much does the loss change when we change the weights connecting the hidden layer to the output layer?
   // From: http://www.adeveloperdiary.com/data-science/deep-learning/neural-network-with-softmax-in-python/
   // Using the chain rule:
   // dL/dW2 = dL/dZ2 * dZ2/dW2
@@ -155,6 +155,7 @@ function backPropagate(params: BackpropParams) {
   //        = dl/dZ2 * a1
   const dW2 = matrixMultiply(dZ2, matrixTranspose(a1));
 
+  // How much does the loss change when we change the biases connecting the hidden layer to the output layer?
   // dL/dB2 = dL/dZ2 * dZ2/dB2
   //        = dL/dZ2 * d/dB2(a1 * w2 + b2)
   //        = dL/dZ2 * 1
@@ -162,7 +163,7 @@ function backPropagate(params: BackpropParams) {
   if (!checkColumnVector(dB2)) {
     throw new Error("dB2 is not a column vector");
   }
-  // Get the gradient for each hidden node
+  // How much does the loss change when we change the unactivated output of the hidden layer?
   // dL/dZ1 = dL/dZ2 * dZ2/dA1 * dA1/dZ1
   //        = dL/dZ2 * d/dA1 (z2) * d/dZ1 (relu(z1))
   //        = dL/dZ2 * d/dA1 (a1 * w2 + b2) * relu'(z1) * 1
@@ -173,13 +174,14 @@ function backPropagate(params: BackpropParams) {
   if (!checkColumnVector(dZ1)) {
     throw new Error("dZ1 is not a column vector");
   }
-  // how much does each weight (connecting an input node to a hidden node) contribute to the error
+  // How much does the loss change when we change the weights connecting the input layer to the hidden layer?
   // dL/dW1 = dL/dZ1 * dZ1/dW1
   //        = dL/dZ1 * d/dW1(z1)
   //        = dL/dZ1 * d/dW1(a0 * w1 + b1)
   //        = dL/dZ1 * a0
   const dW1 = matrixMultiply(dZ1, a0);
 
+  // How much does the loss change when we change the biases connecting the input layer to the hidden layer?
   // dL/dB1 = dL/dZ1 * dZ1/dB1
   //        = dL/dZ1 * d/dB1(a0 * w1 + b1)
   //        = dL/dZ1 * 1
