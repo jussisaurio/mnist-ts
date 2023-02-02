@@ -138,7 +138,7 @@ function backPropagate(params: BackpropParams) {
   // We are implicitly using cross-entropy loss with softmax here:
   // L = -∑expected * log(a2), where a2 is the actual output:
   // a2 = softmax(w2 * z2)
-  // which means the derivative of the loss with respect to the unactivated output is just the difference between the expected and actual output,
+  // From this can be derived that the derivative of the loss with respect to the unactivated output of the output layer is just a2 - expected,
   // explained here: http://www.adeveloperdiary.com/data-science/deep-learning/neural-network-with-softmax-in-python/
   // So, how much does the loss change when we change the unactivated output?
   // dL/dZ2 = a2 - expected
