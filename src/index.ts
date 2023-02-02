@@ -125,7 +125,7 @@ type BackpropParams = ReturnType<typeof forwardPropagate> & {
 };
 
 function backPropagate(params: BackpropParams) {
-  const { a1, a2, z1, input, weights2, expected } = params;
+  const { a1, a2, z1, input, weights2: w2, expected } = params;
 
   // a0, i.e. input activation is just the input vector
   const a0 = [input];
@@ -133,7 +133,7 @@ function backPropagate(params: BackpropParams) {
   // a1 is the activation output of the hidden layer (dimensions: [HIDDEN_SIZE, 1])
   // z2 is the unactivated output of the output layer (dimensions: [OUTPUT_SIZE, 1])
   // a2 is the activation output, i.e. prediction of the output layer (dimensions: [OUTPUT_SIZE, 1])
-  // weights2 is the weights matrix connecting the hidden layer to the output layer (dimensions: [OUTPUT_SIZE, HIDDEN_SIZE])
+  // w2 is the weights matrix connecting the hidden layer to the output layer (dimensions: [OUTPUT_SIZE, HIDDEN_SIZE])
 
   // We are implicitly using cross-entropy loss with softmax here:
   // L = -∑expected * log(a2), where a2 is the actual output:
@@ -167,8 +167,8 @@ function backPropagate(params: BackpropParams) {
   //        = dL/dZ2 * d/dA1 (a1 * w2 + b2) * d/dZ1 (relu(z1))
   //        = dL/dZ2 * w2 * relu'(z1) * 1
   //        = dL/dZ2 * w2 * relu'(z1)
-  const dL_dZ1 = matrixMultiply(matrixTranspose(weights2), dL_dZ2).map(
-    (arr, i) => arr.map((v) => v * reluDerivative(z1[i][0]))
+  const dL_dZ1 = matrixMultiply(matrixTranspose(w2), dL_dZ2).map((arr, i) =>
+    arr.map((v) => v * reluDerivative(z1[i][0]))
   );
   if (!checkColumnVector(dL_dZ1)) {
     throw new Error("dL_dZ1 is not a column vector");
