@@ -164,8 +164,8 @@ function backPropagate(params: BackpropParams) {
   }
   // How much does the loss change when we change the unactivated output of the hidden layer?
   // dL/dZ1 = dL/dZ2 * dZ2/dA1 * dA1/dZ1
-  //        = dL/dZ2 * d/dA1 (z2) * d/dZ1 (relu(z1))
-  //        = dL/dZ2 * d/dA1 (a1 * w2 + b2) * relu'(z1) * 1
+  //        = dL/dZ2 * d/dA1 (a1 * w2 + b2) * d/dZ1 (relu(z1))
+  //        = dL/dZ2 * w2 * relu'(z1) * 1
   //        = dL/dZ2 * w2 * relu'(z1)
   const dZ1 = matrixMultiply(matrixTranspose(weights2), dZ2).map((arr, i) =>
     arr.map((v) => v * reluDerivative(z1[i][0]))
@@ -175,7 +175,6 @@ function backPropagate(params: BackpropParams) {
   }
   // How much does the loss change when we change the weights connecting the input layer to the hidden layer?
   // dL/dW1 = dL/dZ1 * dZ1/dW1
-  //        = dL/dZ1 * d/dW1(z1)
   //        = dL/dZ1 * d/dW1(a0 * w1 + b1)
   //        = dL/dZ1 * a0
   const dW1 = matrixMultiply(dZ1, a0);
