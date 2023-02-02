@@ -148,7 +148,6 @@ function backPropagate(params: BackpropParams) {
   }
 
   // How much does the loss change when we change the weights connecting the hidden layer to the output layer?
-  // From: http://www.adeveloperdiary.com/data-science/deep-learning/neural-network-with-softmax-in-python/
   // Using the chain rule:
   // dL/dW2 = dL/dZ2 * dZ2/dW2
   //        = dl/dZ2 * d/dW2(a1 * w2 + b2)
