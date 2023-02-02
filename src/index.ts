@@ -142,9 +142,9 @@ function backPropagate(params: BackpropParams) {
   // explained here: http://www.adeveloperdiary.com/data-science/deep-learning/neural-network-with-softmax-in-python/
   // So, how much does the loss change when we change the unactivated output?
   // dL/dZ2 = a2 - expected
-  const dZ2 = a2.map((arr, i) => arr.map((v) => v - expected[i]));
-  if (!checkColumnVector(dZ2)) {
-    throw new Error("dZ2 is not a column vector");
+  const dL_dZ2 = a2.map((arr, i) => arr.map((v) => v - expected[i]));
+  if (!checkColumnVector(dL_dZ2)) {
+    throw new Error("dL_dZ2 is not a column vector");
   }
 
   // How much does the loss change when we change the weights connecting the hidden layer to the output layer?
@@ -152,47 +152,47 @@ function backPropagate(params: BackpropParams) {
   // dL/dW2 = dL/dZ2 * dZ2/dW2
   //        = dl/dZ2 * d/dW2(a1 * w2 + b2)
   //        = dl/dZ2 * a1
-  const dW2 = matrixMultiply(dZ2, matrixTranspose(a1));
+  const dL_dW2 = matrixMultiply(dL_dZ2, matrixTranspose(a1));
 
   // How much does the loss change when we change the biases connecting the hidden layer to the output layer?
   // dL/dB2 = dL/dZ2 * dZ2/dB2
   //        = dL/dZ2 * d/dB2(a1 * w2 + b2)
   //        = dL/dZ2 * 1
-  const dB2 = dZ2;
-  if (!checkColumnVector(dB2)) {
-    throw new Error("dB2 is not a column vector");
+  const dL_dB2 = dL_dZ2;
+  if (!checkColumnVector(dL_dB2)) {
+    throw new Error("dL_dB2 is not a column vector");
   }
   // How much does the loss change when we change the unactivated output of the hidden layer?
   // dL/dZ1 = dL/dZ2 * dZ2/dA1 * dA1/dZ1
   //        = dL/dZ2 * d/dA1 (a1 * w2 + b2) * d/dZ1 (relu(z1))
   //        = dL/dZ2 * w2 * relu'(z1) * 1
   //        = dL/dZ2 * w2 * relu'(z1)
-  const dZ1 = matrixMultiply(matrixTranspose(weights2), dZ2).map((arr, i) =>
-    arr.map((v) => v * reluDerivative(z1[i][0]))
+  const dL_dZ1 = matrixMultiply(matrixTranspose(weights2), dL_dZ2).map(
+    (arr, i) => arr.map((v) => v * reluDerivative(z1[i][0]))
   );
-  if (!checkColumnVector(dZ1)) {
-    throw new Error("dZ1 is not a column vector");
+  if (!checkColumnVector(dL_dZ1)) {
+    throw new Error("dL_dZ1 is not a column vector");
   }
   // How much does the loss change when we change the weights connecting the input layer to the hidden layer?
   // dL/dW1 = dL/dZ1 * dZ1/dW1
   //        = dL/dZ1 * d/dW1(a0 * w1 + b1)
   //        = dL/dZ1 * a0
-  const dW1 = matrixMultiply(dZ1, a0);
+  const dL_dW1 = matrixMultiply(dL_dZ1, a0);
 
   // How much does the loss change when we change the biases connecting the input layer to the hidden layer?
   // dL/dB1 = dL/dZ1 * dZ1/dB1
   //        = dL/dZ1 * d/dB1(a0 * w1 + b1)
   //        = dL/dZ1 * 1
-  const dB1 = dZ1;
-  if (!checkColumnVector(dB1)) {
-    throw new Error("dB1 is not a column vector");
+  const dL_dB1 = dL_dZ1;
+  if (!checkColumnVector(dL_dB1)) {
+    throw new Error("dL_dB1 is not a column vector");
   }
 
   return {
-    dW1,
-    dW2,
-    dB1,
-    dB2,
+    dW1: dL_dW1,
+    dW2: dL_dW2,
+    dB1: dL_dB1,
+    dB2: dL_dB2,
   };
 }
 
