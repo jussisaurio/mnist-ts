@@ -129,8 +129,11 @@ function backPropagate(params: BackpropParams) {
 
   // Get the error for each output
   // dimensions of a2 are (rows, cols): [OUTPUT_SIZE, 1]
-  // We are implicitly using cross-entropy loss with softmax here,
-  // which means the derivative of the loss with respect to the output is just the difference between the expected and actual output
+  // We are implicitly using cross-entropy loss with softmax here:
+  // L = -∑expected * log(a2), where a2 is the actual output:
+  // a2 = softmax(w2 * z2)
+  // which means the derivative of the loss with respect to the output is just the difference between the expected and actual output (using chain rule)
+  // dL/dZ2 = a2 - expected (From: http://www.adeveloperdiary.com/data-science/deep-learning/neural-network-with-softmax-in-python/)
   const dZ2 = a2.map((arr, i) => arr.map((v) => v - expected[i]));
   if (!checkColumnVector(dZ2)) {
     throw new Error("dZ2 is not a column vector");
@@ -146,6 +149,10 @@ function backPropagate(params: BackpropParams) {
   // which means the derivative of the loss with respect to the weight is just
   // (output - expected) * previous layer's output
   // From: http://www.adeveloperdiary.com/data-science/deep-learning/neural-network-with-softmax-in-python/
+  // dL/dW2 = dL/dZ2 * dZ2/dW2
+  //        = dl/dZ2 * d/dW2(z2)
+  //        = dl/dZ2 * d/dW2(a1 * w2 + b2)
+  //        = dl/dZ2 * a1
   const dW2 = matrixMultiply(dZ2, matrixTranspose(a1));
 
   // bias for the output nodes is simply the error for that node
@@ -160,6 +167,12 @@ function backPropagate(params: BackpropParams) {
   // the result, dZ1, is [HIDDEN_SIZE, 1], which is what we expect:
   // each hidden node (16) has a single delta for each of its outputs;
   // the z1 output dimensions are naturally also [HIDDEN_SIZE, 1]
+  //
+  // dL/dZ1 = dL/dZ2 * dZ2/dA1 * dA1/dZ1
+  //        = dL/dZ2 * dZ2/dA1 * dA1/dZ1
+  //        = dL/dZ2 * d/dA1 (z2) * d/dZ1 (relu(z1))
+  //        = dL/dZ2 * d/dA1 (a1 * w2 + b2) * relu'(z1)
+  //        = dL/dZ2 * w2 * relu'(z1)
   const dZ1 = matrixMultiply(matrixTranspose(weights2), dZ2).map((arr, i) =>
     arr.map((v) => v * reluDerivative(z1[i][0]))
   );
@@ -167,6 +180,10 @@ function backPropagate(params: BackpropParams) {
     throw new Error("dZ1 is not a column vector");
   }
   // how much does each weight (connecting an input node to a hidden node) contribute to the error
+  // dL/dW1 = dL/dZ1 * dZ1/dW1
+  //        = dL/dZ1 * d/dW1(z1)
+  //        = dL/dZ1 * d/dW1(a0 * w1 + b1)
+  //        = dL/dZ1 * a0
   const dW1 = matrixMultiply(dZ1, [input]);
   // bias for the hidden nodes is simply the activation error for that node
   const dB1 = dZ1;
