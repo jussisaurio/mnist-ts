@@ -178,7 +178,7 @@ function backPropagate(params: BackpropParams) {
   //        = dL/dZ1 * d/dW1(z1)
   //        = dL/dZ1 * d/dW1(a0 * w1 + b1)
   //        = dL/dZ1 * a0
-  const dW1 = matrixMultiply(dZ1, [input]);
+  const dW1 = matrixMultiply(dZ1, a0);
 
   // dL/dB1 = dL/dZ1 * dZ1/dB1
   //        = dL/dZ1 * d/dB1(a0 * w1 + b1)
