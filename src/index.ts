@@ -127,51 +127,45 @@ type BackpropParams = ReturnType<typeof forwardPropagate> & {
 function backPropagate(params: BackpropParams) {
   const { a1, a2, z1, z2, input, weights2, expected } = params;
 
-  // Get the error for each output
-  // dimensions of a2 are (rows, cols): [OUTPUT_SIZE, 1]
+  // a0, i.e. input activation is just the input vector
+  const a0 = [input];
+  // z1 is the unactivated output of the hidden layer (dimensions: [HIDDEN_SIZE, 1])
+  // a1 is the activation output of the hidden layer (dimensions: [HIDDEN_SIZE, 1])
+  // z2 is the unactivated output of the output layer (dimensions: [OUTPUT_SIZE, 1])
+  // a2 is the activation output, i.e. prediction of the output layer (dimensions: [OUTPUT_SIZE, 1])
+  // weights2 is the weights matrix connecting the hidden layer to the output layer (dimensions: [OUTPUT_SIZE, HIDDEN_SIZE])
+
   // We are implicitly using cross-entropy loss with softmax here:
   // L = -∑expected * log(a2), where a2 is the actual output:
   // a2 = softmax(w2 * z2)
-  // which means the derivative of the loss with respect to the output is just the difference between the expected and actual output (using chain rule)
-  // dL/dZ2 = a2 - expected (From: http://www.adeveloperdiary.com/data-science/deep-learning/neural-network-with-softmax-in-python/)
+  // which means the derivative of the loss with respect to the unactivated output is just the difference between the expected and actual output,
+  // explained here: http://www.adeveloperdiary.com/data-science/deep-learning/neural-network-with-softmax-in-python/
+  //
+  // dL/dZ2 = a2 - expected
   const dZ2 = a2.map((arr, i) => arr.map((v) => v - expected[i]));
   if (!checkColumnVector(dZ2)) {
     throw new Error("dZ2 is not a column vector");
   }
-  // how much does each weight (connecting a hidden node to an output node) contribute to the error
-  // dimensions of dZ2 are (rows, cols): [OUTPUT_SIZE, 1]
-  // dimensions of a1 are [HIDDEN_SIZE, 1] so we need to transpose it to [1, HIDDEN_SIZE]
-  // in matmul, because the dimensions are multiplier's rows * multiplicand's cols,
-  // the result is [OUTPUT_SIZE, HIDDEN_SIZE], which is what we expect:
-  // each output node (10) has a weight for each hidden node (16)
 
-  // We are implicitly using cross-entropy loss with softmax here,
-  // which means the derivative of the loss with respect to the weight is just
-  // (output - expected) * previous layer's output
+  // How much does each weight (connecting a hidden node to an output node) contribute to the loss?
   // From: http://www.adeveloperdiary.com/data-science/deep-learning/neural-network-with-softmax-in-python/
+  // Using the chain rule:
   // dL/dW2 = dL/dZ2 * dZ2/dW2
-  //        = dl/dZ2 * d/dW2(z2)
   //        = dl/dZ2 * d/dW2(a1 * w2 + b2)
   //        = dl/dZ2 * a1
   const dW2 = matrixMultiply(dZ2, matrixTranspose(a1));
 
-  // bias for the output nodes is simply the error for that node
+  // dL/dB2 = dL/dZ2 * dZ2/dB2
+  //        = dL/dZ2 * d/dB2(a1 * w2 + b2)
+  //        = dL/dZ2 * 1
   const dB2 = dZ2;
   if (!checkColumnVector(dB2)) {
     throw new Error("dB2 is not a column vector");
   }
-  // Get the error for each hidden node
-  // dimensions of weights2 when transposed are (rows, cols): [HIDDEN_SIZE, OUTPUT_SIZE]
-  // dimensions of dZ2 are (rows, cols): [OUTPUT_SIZE, 1]
-  // in matmul, because the dimensions are multiplier's rows * multiplicand's cols,
-  // the result, dZ1, is [HIDDEN_SIZE, 1], which is what we expect:
-  // each hidden node (16) has a single delta for each of its outputs;
-  // the z1 output dimensions are naturally also [HIDDEN_SIZE, 1]
-  //
+  // Get the gradient for each hidden node
   // dL/dZ1 = dL/dZ2 * dZ2/dA1 * dA1/dZ1
-  //        = dL/dZ2 * dZ2/dA1 * dA1/dZ1
   //        = dL/dZ2 * d/dA1 (z2) * d/dZ1 (relu(z1))
-  //        = dL/dZ2 * d/dA1 (a1 * w2 + b2) * relu'(z1)
+  //        = dL/dZ2 * d/dA1 (a1 * w2 + b2) * relu'(z1) * 1
   //        = dL/dZ2 * w2 * relu'(z1)
   const dZ1 = matrixMultiply(matrixTranspose(weights2), dZ2).map((arr, i) =>
     arr.map((v) => v * reluDerivative(z1[i][0]))
@@ -185,7 +179,10 @@ function backPropagate(params: BackpropParams) {
   //        = dL/dZ1 * d/dW1(a0 * w1 + b1)
   //        = dL/dZ1 * a0
   const dW1 = matrixMultiply(dZ1, [input]);
-  // bias for the hidden nodes is simply the activation error for that node
+
+  // dL/dB1 = dL/dZ1 * dZ1/dB1
+  //        = dL/dZ1 * d/dB1(a0 * w1 + b1)
+  //        = dL/dZ1 * 1
   const dB1 = dZ1;
   if (!checkColumnVector(dB1)) {
     throw new Error("dB1 is not a column vector");
