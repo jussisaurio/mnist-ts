@@ -73,42 +73,36 @@ function createNetwork(): Network {
   };
 }
 
-function forwardPropagate(input: number[], params: Network["params"]) {
+function forwardPropagate(input: number[][], params: Network["params"]) {
   const { weights1, weights2, biases1, biases2 } = params;
 
   // weights1 matrix dimensions (rows, cols) are [HIDDEN_SIZE, INPUT_SIZE]
-  // input vector dimensions are [1, INPUT_SIZE] so we need to transpose it to [INPUT_SIZE, 1]
+  // input vector dimensions are [SAMPLE_SIZE, INPUT_SIZE] so we need to transpose it to [INPUT_SIZE, SAMPLE_SIZE]
   // in matmul, the dimensions of the result are multiplier's rows and multiplicand's cols,
-  // so the dimensions of z1 are [HIDDEN_SIZE, 1], which is what we expect:
-  // each hidden node has a single output
-  const transposedInput = matrixTranspose([input]);
-  const z1 = matrixMultiply(weights1, transposedInput).map((arr, i) =>
+  // so the dimensions of z1 are [HIDDEN_SIZE, SAMPLE_SIZE], which is what we expect:
+  // each hidden node has a single output for each sample
+  const samples = matrixTranspose(input);
+  const z1 = matrixMultiply(weights1, samples).map((arr, i) =>
     arr.map((v) => v + biases1[i][0])
   );
+
   // run the hidden layer through the activation function to get some nonlinearity up in this motha
   // a1 is the output of the hidden layer, so it has the same dimensions as z1
   const a1 = z1.map((arr) => arr.map(relu));
-  if (!checkColumnVector(a1)) {
-    throw new Error("a1 is not a column vector");
-  }
 
   // weights2 matrix dimensions (rows, cols) are [OUTPUT_SIZE, HIDDEN_SIZE]
-  // a1 vector dimensions are [HIDDEN_SIZE, 1]
+  // a1 vector dimensions are [HIDDEN_SIZE, SAMPLE_SIZE]
   // in matmul, the dimensions of the result are multiplier's rows and multiplicand's cols,
-  // so the dimensions of z2 are [OUTPUT_SIZE, 1], which is what we expect:
-  // each output node has a single output
+  // so the dimensions of z2 are [OUTPUT_SIZE, SAMPLE_SIZE], which is what we expect:
+  // each output node has a single output for each sample
   const z2 = matrixMultiply(weights2, a1).map((arr, i) =>
     arr.map((v) => v + biases2[i][0])
   );
 
   // run the output layer through the activation function to get some nonlinearity up in this motha
   // the sum of the softmax values should be 1, so we can use it as a probability distribution
-  const z2Vector = z2.map((arr) => arr[0]);
-  const a2 = matrixTranspose([softmax(z2Vector)]);
-
-  if (!checkColumnVector(a2)) {
-    throw new Error("a2 is not a column vector");
-  }
+  const z2Transposed = matrixTranspose(z2);
+  const a2 = matrixTranspose(z2Transposed.map(softmax));
 
   return {
     a1,
@@ -120,19 +114,20 @@ function forwardPropagate(input: number[], params: Network["params"]) {
 
 type BackpropParams = ReturnType<typeof forwardPropagate> & {
   weights2: number[][];
-  input: number[];
-  expected: number[];
+  input: number[][];
+  expected: number[][];
 };
 
 function backPropagate(params: BackpropParams) {
   const { a1, a2, z1, input, weights2: w2, expected } = params;
 
-  // a0, i.e. input activation is just the input vector
-  const a0 = [input];
-  // z1 is the unactivated output of the hidden layer (dimensions: [HIDDEN_SIZE, 1])
-  // a1 is the activation output of the hidden layer (dimensions: [HIDDEN_SIZE, 1])
-  // z2 is the unactivated output of the output layer (dimensions: [OUTPUT_SIZE, 1])
-  // a2 is the activation output, i.e. prediction of the output layer (dimensions: [OUTPUT_SIZE, 1])
+  // expected is the expected output of the network (dimensions: [SAMPLE_SIZE, OUTPUT_SIZE])
+  // a0, i.e. input activation is just the inputs (dimensions: [SAMPLE_SIZE, INPUT_SIZE])
+  const a0 = input;
+  // z1 is the unactivated output of the hidden layer (dimensions: [HIDDEN_SIZE, SAMPLE_SIZE])
+  // a1 is the activation output of the hidden layer (dimensions: [HIDDEN_SIZE, SAMPLE_SIZE])
+  // z2 is the unactivated output of the output layer (dimensions: [OUTPUT_SIZE, SAMPLE_SIZE])
+  // a2 is the activation output, i.e. prediction of the output layer (dimensions: [OUTPUT_SIZE, SAMPLE_SIZE])
   // w2 is the weights matrix connecting the hidden layer to the output layer (dimensions: [OUTPUT_SIZE, HIDDEN_SIZE])
 
   // We are implicitly using cross-entropy loss with softmax here:
@@ -142,10 +137,14 @@ function backPropagate(params: BackpropParams) {
   // explained here: http://www.adeveloperdiary.com/data-science/deep-learning/neural-network-with-softmax-in-python/
   // So, how much does the loss change when we change the unactivated output?
   // dL/dZ2 = a2 - expected
-  const dL_dZ2 = a2.map((arr, i) => arr.map((v) => v - expected[i]));
-  if (!checkColumnVector(dL_dZ2)) {
-    throw new Error("dL_dZ2 is not a column vector");
-  }
+  const dL_dZ2 = a2.map((arr, i) =>
+    arr
+      .map((v, j) => v - expected[i][j])
+      .map(
+        // take the mean of the loss changes for each sample
+        (v) => v / a2.length
+      )
+  );
 
   // How much does the loss change when we change the weights connecting the hidden layer to the output layer?
   // Using the chain rule:
@@ -158,7 +157,9 @@ function backPropagate(params: BackpropParams) {
   // dL/dB2 = dL/dZ2 * dZ2/dB2
   //        = dL/dZ2 * d/dB2(a1 * w2 + b2)
   //        = dL/dZ2 * 1
-  const dL_dB2 = dL_dZ2;
+  const dL_dB2 = dL_dZ2.map((row) => [
+    row.reduce((acc, v) => acc + v, 0) / row.length,
+  ]);
   if (!checkColumnVector(dL_dB2)) {
     throw new Error("dL_dB2 is not a column vector");
   }
@@ -170,20 +171,20 @@ function backPropagate(params: BackpropParams) {
   const dL_dZ1 = matrixMultiply(matrixTranspose(w2), dL_dZ2).map((arr, i) =>
     arr.map((v) => v * reluDerivative(z1[i][0]))
   );
-  if (!checkColumnVector(dL_dZ1)) {
-    throw new Error("dL_dZ1 is not a column vector");
-  }
+
   // How much does the loss change when we change the weights connecting the input layer to the hidden layer?
   // dL/dW1 = dL/dZ1 * dZ1/dW1
   //        = dL/dZ1 * d/dW1(a0 * w1 + b1)
   //        = dL/dZ1 * a0
-  const dL_dW1 = matrixMultiply(dL_dZ1, a0);
+  const dL_dW1 = matrixMultiply(dL_dZ1, matrixTranspose(a0));
 
   // How much does the loss change when we change the biases connecting the input layer to the hidden layer?
   // dL/dB1 = dL/dZ1 * dZ1/dB1
   //        = dL/dZ1 * d/dB1(a0 * w1 + b1)
   //        = dL/dZ1 * 1
-  const dL_dB1 = dL_dZ1;
+  const dL_dB1 = dL_dZ1.map((row) => [
+    row.reduce((acc, v) => acc + v, 0) / row.length,
+  ]);
   if (!checkColumnVector(dL_dB1)) {
     throw new Error("dL_dB1 is not a column vector");
   }
@@ -234,7 +235,7 @@ function getAccuracy(
   params: Network["params"]
 ) {
   const correct = test.reduce((acc, { input, output }) => {
-    const { a2 } = forwardPropagate(input, params);
+    const { a2 } = forwardPropagate([input], params);
     const a2transpose = a2.map((arr) => arr[0]);
     const prediction = a2transpose.indexOf(Math.max(...a2transpose));
     const actual = output.indexOf(Math.max(...output));
@@ -247,6 +248,7 @@ function getAccuracy(
 type GradientDescentParams = {
   learningRate: number;
   epochs: number;
+  batchSize: number;
   trainingData: {
     input: number[];
     output: number[];
@@ -272,18 +274,22 @@ function gradientDescent(props: GradientDescentParams) {
         typeof createNetwork
       >)
     : createNetwork();
-  const { learningRate, epochs, trainingData, testData } = props;
+  const { learningRate, epochs, trainingData, testData, batchSize } = props;
 
   for (let i = 0; i < epochs; i++) {
-    const trainingsample = getRandomSample(trainingData, 1000);
-
-    for (let j = 0; j < trainingsample.length; j++) {
-      const { input, output } = trainingsample[j];
+    console.log(`Epoch ${i + 1} started, batch size: ${batchSize}`);
+    let batches = 0;
+    for (let j = 0; j < trainingData.length; j += batchSize) {
+      batches++;
+      const batch = trainingData.slice(j, j + batchSize);
+      const input = batch.map((d) => d.input);
       const forward = forwardPropagate(input, model.params);
+
+      const expected = batch.map((d) => d.output);
       const backprop = backPropagate({
         ...forward,
-        input,
-        expected: output,
+        input: matrixTranspose(input),
+        expected: matrixTranspose(expected),
         weights2: model.params.weights2,
       });
       updateWeightsAndBiases(
@@ -294,13 +300,21 @@ function gradientDescent(props: GradientDescentParams) {
         backprop.dB2,
         learningRate
       );
+
+      // every now and then log the accuracy
+      if (batches % 200 === 0) {
+        const accuracy = getAccuracy(
+          getRandomSample(testData, 100),
+          model.params
+        );
+
+        console.log(`Interim accuracy: ${accuracy}`);
+      }
     }
 
     const accuracy = getAccuracy(getRandomSample(testData, 100), model.params);
 
-    console.log(
-      `Epoch ${i + 1} accuracy on a random 100 image sample: ${accuracy}`
-    );
+    console.log(`Epoch ${i + 1} accuracy: ${accuracy}`);
   }
 
   return {
@@ -312,13 +326,15 @@ function gradientDescent(props: GradientDescentParams) {
 const command = process.argv[2];
 
 if (command === "train") {
-  const epochs = parseInt(process.argv[3], 10) || 100;
+  const epochs = parseInt(process.argv[3], 10) || 10;
   const learningRate = parseFloat(process.argv[4]) || 0.01;
+  const batchSize = parseInt(process.argv[5], 10) || 10;
   const finishedModel = gradientDescent({
     learningRate,
     epochs,
     trainingData: train,
     testData: test,
+    batchSize,
   });
 
   const existingModel = (() => {
@@ -351,7 +367,7 @@ if (command === "train") {
 
   let correct = 0;
   samples.forEach(({ input, output }) => {
-    const { a2 } = forwardPropagate(input, model.params);
+    const { a2 } = forwardPropagate([input], model.params);
     const a2transpose = a2.map((arr) => arr[0]);
     const prediction = a2transpose.indexOf(Math.max(...a2transpose));
     const actual = (output as number[]).indexOf(Math.max(...output));
