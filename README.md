@@ -1,6 +1,6 @@
 # Neural network from scratch in TypeScript
 
-Zero-dependency neural network trained to recognize handwritten digits from the MNIST dataset. The stored src/model.json file has an accuracy of 94.3% on the test set. The training performance is horrible and I don't _really_ know what I'm doing, but who cares.
+Zero-dependency neural network trained to recognize handwritten digits from the MNIST dataset. The stored src/model.json file has an accuracy of 94.3% on the test set. The training performance is not very good. :)
 
 ## Install
 
@@ -18,13 +18,13 @@ src/dataset/mnist_test.csv
 ### Train
 
 ```bash
-npm run train <epochs> <learning_rate> # epochs = 100, learning_rate = 0.01
+npm run train <epochs> <learning_rate> <batch_size>
 ```
 
 #### Retrain existing model
 
 ```bash
-USE_EXISTING=true npm run train <epochs> <learning_rate>
+USE_EXISTING=true npm run train <epochs> <learning_rate> <batch_size>
 ```
 
 ### Test

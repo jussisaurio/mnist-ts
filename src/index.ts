@@ -7,60 +7,57 @@ import { relu, reluDerivative, softmax } from "./activation";
 const train = mnistTrainingSet;
 const test = mnistTestSet;
 
-type ColumnVector = [number][];
-
-const checkColumnVector = (v: number[][]): v is ColumnVector => {
-  return process.env.NODE_ENV === "production"
-    ? true
-    : v.every((row) => row.length === 1 && typeof row[0] === "number");
-};
-
 type Network = {
   params: {
-    weights1: number[][];
-    weights2: number[][];
-    biases1: ColumnVector;
-    biases2: ColumnVector;
+    weights1: number[][]; // [HIDDEN_SIZE, INPUT_SIZE]
+    weights2: number[][]; // [OUTPUT_SIZE, HIDDEN_SIZE]
+    biases1: number[][]; // [HIDDEN_SIZE, 1]
+    biases2: number[][]; // [OUTPUT_SIZE, 1]
   };
   accuracy: number;
 };
+
+const matrixOf = ({
+  rows,
+  cols,
+  initialValue,
+}: {
+  rows: number;
+  cols: number;
+  initialValue: () => number;
+}) =>
+  Array(rows)
+    .fill(0)
+    .map(() => Array(cols).fill(0).map(initialValue));
 
 function createNetwork(): Network {
   const INPUT_SIZE = 784;
   const HIDDEN_SIZE = 16;
   const OUTPUT_SIZE = 10;
 
-  const weights1 = Array(HIDDEN_SIZE)
-    .fill(0)
-    .map(() =>
-      Array(INPUT_SIZE)
-        .fill(0)
-        .map(() => Math.random() - 0.5)
-    );
+  const weights1 = matrixOf({
+    rows: HIDDEN_SIZE,
+    cols: INPUT_SIZE,
+    initialValue: () => Math.random() - 0.5,
+  });
 
-  const weights2 = Array(OUTPUT_SIZE)
-    .fill(0)
-    .map(() =>
-      Array(HIDDEN_SIZE)
-        .fill(0)
-        .map(() => Math.random() - 0.5)
-    );
+  const weights2 = matrixOf({
+    rows: OUTPUT_SIZE,
+    cols: HIDDEN_SIZE,
+    initialValue: () => Math.random() - 0.5,
+  });
 
-  const biases1 = Array(HIDDEN_SIZE)
-    .fill(0)
-    .map(() => [Math.random() * 2 - 1]);
+  const biases1 = matrixOf({
+    rows: HIDDEN_SIZE,
+    cols: 1,
+    initialValue: () => Math.random() * 2 - 1,
+  });
 
-  const biases2 = Array(OUTPUT_SIZE)
-    .fill(0)
-    .map(() => [Math.random() * 2 - 1]);
-
-  if (!checkColumnVector(biases1)) {
-    throw new Error("biases1 is not a column vector");
-  }
-
-  if (!checkColumnVector(biases2)) {
-    throw new Error("biases2 is not a column vector");
-  }
+  const biases2 = matrixOf({
+    rows: OUTPUT_SIZE,
+    cols: 1,
+    initialValue: () => Math.random() * 2 - 1,
+  });
 
   return {
     params: {
@@ -137,32 +134,23 @@ function backPropagate(params: BackpropParams) {
   // explained here: http://www.adeveloperdiary.com/data-science/deep-learning/neural-network-with-softmax-in-python/
   // So, how much does the loss change when we change the unactivated output?
   // dL/dZ2 = a2 - expected
-  const dL_dZ2 = a2.map((arr, i) =>
-    arr
-      .map((v, j) => v - expected[i][j])
-      .map(
-        // take the mean of the loss changes for each sample
-        (v) => v / a2.length
-      )
-  );
+  const dL_dZ2 = a2.map((arr, i) => arr.map((v, j) => v - expected[i][j]));
 
   // How much does the loss change when we change the weights connecting the hidden layer to the output layer?
   // Using the chain rule:
   // dL/dW2 = dL/dZ2 * dZ2/dW2
   //        = dl/dZ2 * d/dW2(a1 * w2 + b2)
   //        = dl/dZ2 * a1
-  const dL_dW2 = matrixMultiply(dL_dZ2, matrixTranspose(a1));
+  const dL_dW2 = matrixMultiply(dL_dZ2, matrixTranspose(a1)).map(
+    (row) => row.map((v) => v / a1[0].length) // divide by the sample size to get the average
+  );
 
   // How much does the loss change when we change the biases connecting the hidden layer to the output layer?
   // dL/dB2 = dL/dZ2 * dZ2/dB2
   //        = dL/dZ2 * d/dB2(a1 * w2 + b2)
   //        = dL/dZ2 * 1
-  const dL_dB2 = dL_dZ2.map((row) => [
-    row.reduce((acc, v) => acc + v, 0) / row.length,
-  ]);
-  if (!checkColumnVector(dL_dB2)) {
-    throw new Error("dL_dB2 is not a column vector");
-  }
+  const dL_dB2 = dL_dZ2.map((row) => [row.reduce((acc, v) => acc + v, 0)]);
+
   // How much does the loss change when we change the unactivated output of the hidden layer?
   // dL/dZ1 = dL/dZ2 * dZ2/dA1 * dA1/dZ1
   //        = dL/dZ2 * d/dA1 (a1 * w2 + b2) * d/dZ1 (relu(z1))
@@ -176,18 +164,15 @@ function backPropagate(params: BackpropParams) {
   // dL/dW1 = dL/dZ1 * dZ1/dW1
   //        = dL/dZ1 * d/dW1(a0 * w1 + b1)
   //        = dL/dZ1 * a0
-  const dL_dW1 = matrixMultiply(dL_dZ1, matrixTranspose(a0));
+  const dL_dW1 = matrixMultiply(dL_dZ1, matrixTranspose(a0)).map(
+    (row) => row.map((v) => v / a0[0].length) // divide by sample size to get the average
+  );
 
   // How much does the loss change when we change the biases connecting the input layer to the hidden layer?
   // dL/dB1 = dL/dZ1 * dZ1/dB1
   //        = dL/dZ1 * d/dB1(a0 * w1 + b1)
   //        = dL/dZ1 * 1
-  const dL_dB1 = dL_dZ1.map((row) => [
-    row.reduce((acc, v) => acc + v, 0) / row.length,
-  ]);
-  if (!checkColumnVector(dL_dB1)) {
-    throw new Error("dL_dB1 is not a column vector");
-  }
+  const dL_dB1 = dL_dZ1.map((row) => [row.reduce((acc, v) => acc + v, 0)]);
 
   return {
     dW1: dL_dW1,
@@ -215,11 +200,6 @@ function updateWeightsAndBiases(
   );
   const newBiases1 = biases1.map((v, i) => [v[0] - learningRate * dB1[i][0]]);
   const newBiases2 = biases2.map((v, i) => [v[0] - learningRate * dB2[i][0]]);
-
-  if (!checkColumnVector(newBiases1))
-    throw new Error("newBiases1 is not a column vector");
-  if (!checkColumnVector(newBiases2))
-    throw new Error("newBiases2 is not a column vector");
 
   params.weights1 = newWeights1;
   params.weights2 = newWeights2;
@@ -308,7 +288,7 @@ function gradientDescent(props: GradientDescentParams) {
           model.params
         );
 
-        console.log(`Interim accuracy: ${accuracy}`);
+        // console.log(`Interim accuracy: ${accuracy}`);
       }
     }
 
