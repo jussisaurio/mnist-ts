@@ -18,17 +18,17 @@ src/dataset/mnist_test.csv
 ### Train
 
 ```bash
-npm run train <epochs> <learning_rate> <batch_size>
+npm run mnist:train <epochs> <learning_rate> <batch_size>
 ```
 
 #### Retrain existing model
 
 ```bash
-USE_EXISTING=true npm run train <epochs> <learning_rate> <batch_size>
+USE_EXISTING=true npm run mnist:train <epochs> <learning_rate> <batch_size>
 ```
 
 ### Test
 
 ```bash
-npm run test
+npm run mnist:test
 ```
