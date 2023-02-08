@@ -1,9 +1,5 @@
 import * as fs from "fs";
 import {
-  createSingleHiddenLayerNetwork,
-  singleLayerForwardPropagate,
-  singleLayerGradientDescent,
-  SingleHiddenLayerNetwork,
   MultiHiddenLayerNetwork,
   createMultiHiddenLayerNetwork,
   multiLayerGradientDescent,
