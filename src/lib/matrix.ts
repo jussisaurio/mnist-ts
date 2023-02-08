@@ -108,6 +108,38 @@ export const matrixScalarDivide = (a: number[][], b: number) => {
 
 export const mSD = matrixScalarDivide;
 
+export const matrixMap = (a: number[][], fn: (n: number) => number) => {
+  const result: number[][] = [];
+
+  for (let i = 0; i < a.length; i++) {
+    result[i] = [];
+
+    for (let j = 0; j < a[0].length; j++) {
+      result[i][j] = fn(a[i][j]);
+    }
+  }
+
+  return result;
+};
+
+export const mMap = matrixMap;
+
+export const matrixHadamard = (a: number[][], b: number[][]) => {
+  const result: number[][] = [];
+
+  for (let i = 0; i < a.length; i++) {
+    result[i] = [];
+
+    for (let j = 0; j < a[0].length; j++) {
+      result[i][j] = a[i][j] * b[i][j];
+    }
+  }
+
+  return result;
+};
+
+export const mHad = matrixHadamard;
+
 export const matrixOf = ({
   rows,
   cols,

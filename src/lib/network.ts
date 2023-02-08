@@ -1,5 +1,15 @@
 import { relu, reluDerivative, softmax } from "./activation";
-import { mMul, matrixOf, mSD, mSM, mSub, T } from "./matrix";
+import {
+  mMul,
+  matrixOf,
+  mSD,
+  mSM,
+  mSub,
+  T,
+  mMap,
+  getShape,
+  mHad,
+} from "./matrix";
 
 export type CreateMultiHiddenLayerNetworkProps = {
   inputSize: number;
@@ -150,17 +160,11 @@ export function multiLayerBackPropagate(
 
     // For dA_Hidden/dZ_Hidden, we can use the derivative of the activation function.
     // Since A_Hidden = relu(Z_Hidden):
-    // dA_Hidden/dZ_Hidden = relu'(Z_Hidden) * 1 // the 1 comes from the chain rule f'(g(x)) * g'(x)
+    // dA_Hidden/dZ_Hidden = relu'(Z_Hidden)
     // So: dLoss/dZ_Hidden = dZNext * W_Next * relu'(Z_Hidden)
     const [Z_Hidden] = hiddenLayers[i];
-
-    const dZ_Hidden = mMul(T(W_Next), dZNext).map((row, j) => {
-      return row.map((v, k) => v * reluDerivative(Z_Hidden[j][k]));
-    });
-
-    // dLoss/dW_Hidden = dLoss/dZHidden * dZ_Hidden/dW_Hidden
-    // For dZ_Hidden/dW_Hidden, we can expand Z_Hidden to = W_Hidden * A_Prev + B_Hidden
-    // So: dZ_Hidden/dW_Hidden = A_Prev
+    const reluDerivZHidden = mMap(Z_Hidden, reluDerivative);
+    const dZ_Hidden = mHad(reluDerivZHidden, mMul(T(W_Next), dZNext));
 
     // So: dLoss/dW_Hidden = dLoss/dZ_Hidden * A_Prev
     const A_Prev = i === 0 ? inputLayerA : hiddenLayers[i - 1][1];
