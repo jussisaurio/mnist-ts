@@ -28,8 +28,6 @@ const parsedDataset = ticTacToeDataset
 const train = parsedDataset.slice(0, 8000);
 const test = parsedDataset.slice(8000);
 
-console.log(train[0]);
-
 const command = process.argv[2];
 
 if (command === "train") {
