@@ -1,6 +1,6 @@
 # Neural network from scratch in TypeScript
 
-Zero-dependency neural network trained to recognize handwritten digits from the MNIST dataset. The stored src/mnist-model.json file has an accuracy of 93.6% on the test set. The training performance is not very good. :)
+Zero-dependency neural network trained to recognize handwritten digits from the MNIST dataset. The stored src/mnist-model.json file has an accuracy of 94.3% on the test set. The training performance is not very good. :)
 
 ## Install
 
