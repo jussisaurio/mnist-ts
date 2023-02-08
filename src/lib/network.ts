@@ -1,5 +1,5 @@
 import { relu, reluDerivative, softmax } from "./activation";
-import { getShape, mMul, matrixOf, mSD, mSM, mSub, T } from "./matrix";
+import { mMul, matrixOf, mSD, mSM, mSub, T } from "./matrix";
 import { getRandomSample } from "./util";
 
 export type SingleHiddenLayerNetwork = {
@@ -297,30 +297,27 @@ export function multiLayerBackPropagate(
 
   const batchSize = expected[0].length;
 
-  const [inputLayerZ, inputLayerA] = outputsAndActivations[0];
+  const [_, inputLayerA] = outputsAndActivations[0];
   const hiddenLayers = outputsAndActivations.slice(
     1,
     outputsAndActivations.length - 1
   );
-  const [outputLayerZ, outputLayerA] =
+  const [__, outputLayerA] =
     outputsAndActivations[outputsAndActivations.length - 1];
-
-  const outputLayerWeights = weights[weights.length - 1];
 
   const dW: any[] = [];
   const dB: any[] = [];
 
   const dZOutput = mSub(outputLayerA, expected);
 
-  const [lastHiddenLayerZ, lastHiddenLayerA] =
-    hiddenLayers[hiddenLayers.length - 1];
+  const [___, lastHiddenLayerA] = hiddenLayers[hiddenLayers.length - 1];
 
   dW.unshift(mSD(mMul(dZOutput, T(lastHiddenLayerA)), batchSize));
   dB.unshift(mSD(dZOutput, batchSize));
 
   let dZPrev = dZOutput;
   for (let i = hiddenLayers.length - 1; i >= 0; i--) {
-    const [hiddenZ, hiddenA] = hiddenLayers[i];
+    const [hiddenZ] = hiddenLayers[i];
     const nextWeights = T(weights[i + 1]);
     const dZ = mMul(nextWeights, dZPrev).map((row, j, self) => {
       return row.map((v, k) => v * reluDerivative(hiddenZ[j][k]));
