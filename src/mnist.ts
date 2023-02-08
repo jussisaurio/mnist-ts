@@ -2,10 +2,10 @@ import { mnistTestSet, mnistTrainingSet } from "./dataset/parseDataset";
 
 import * as fs from "fs";
 import {
-  MultiHiddenLayerNetwork,
-  createMultiHiddenLayerNetwork,
-  multiLayerGradientDescent,
-  multiLayerForwardPropagate,
+  Network,
+  createNetwork,
+  gradientDescent,
+  forwardPropagate,
 } from "./lib/network";
 import { getRandomSample } from "./lib/util";
 
@@ -20,15 +20,13 @@ if (command === "train") {
   const batchSize = parseInt(process.argv[5], 10) || 10;
 
   const model = process.env.USE_EXISTING
-    ? (JSON.parse(
-        fs.readFileSync("src/mnist-model.json", "utf8")
-      ) as MultiHiddenLayerNetwork)
-    : createMultiHiddenLayerNetwork({
+    ? (JSON.parse(fs.readFileSync("src/mnist-model.json", "utf8")) as Network)
+    : createNetwork({
         inputSize: 784,
         hiddenSizes: [16, 16, 16],
         outputSize: 10,
       });
-  const finishedModel = multiLayerGradientDescent(model, {
+  const finishedModel = gradientDescent(model, {
     learningRate,
     epochs,
     trainingData: train,
@@ -66,7 +64,7 @@ if (command === "train") {
 
   let correct = 0;
   samples.forEach(({ input, output }) => {
-    const forward = multiLayerForwardPropagate([input], model.params);
+    const forward = forwardPropagate([input], model.params);
     const a2 = forward[forward.length - 1][1];
     const a2transpose = a2.map((arr) => arr[0]);
     const prediction = a2transpose.indexOf(Math.max(...a2transpose));

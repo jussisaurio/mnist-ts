@@ -1,9 +1,9 @@
 import * as fs from "fs";
 import {
-  MultiHiddenLayerNetwork,
-  createMultiHiddenLayerNetwork,
-  multiLayerGradientDescent,
-  multiLayerForwardPropagate,
+  Network,
+  createNetwork,
+  gradientDescent,
+  forwardPropagate,
 } from "./lib/network";
 import { getRandomSample } from "./lib/util";
 
@@ -34,13 +34,13 @@ if (command === "train") {
   const model = process.env.USE_EXISTING
     ? (JSON.parse(
         fs.readFileSync("src/tictactoe-model.json", "utf8")
-      ) as MultiHiddenLayerNetwork)
-    : createMultiHiddenLayerNetwork({
+      ) as Network)
+    : createNetwork({
         inputSize: 27,
         hiddenSizes: [12, 12],
         outputSize: 4,
       });
-  const finishedModel = multiLayerGradientDescent(model, {
+  const finishedModel = gradientDescent(model, {
     learningRate,
     epochs,
     trainingData: train,
@@ -111,7 +111,7 @@ if (command === "train") {
 
   let correct = 0;
   samples.forEach(({ input, output }) => {
-    const forward = multiLayerForwardPropagate([input], model.params);
+    const forward = forwardPropagate([input], model.params);
     const lastLayerA = forward[forward.length - 1][1];
     const lastLayerTranspose = lastLayerA.map((arr) => arr[0]);
     const prediction =

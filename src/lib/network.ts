@@ -3,13 +3,13 @@ import { mMul, matrixOf, mSD, mSM, mSub, T, mMap, mHad } from "./matrix";
 
 export type Matrix = number[][];
 
-export type CreateMultiHiddenLayerNetworkProps = {
+export type CreateNetworkProps = {
   inputSize: number;
   hiddenSizes: number[];
   outputSize: number;
 };
 
-export type MultiHiddenLayerNetwork = {
+export type Network = {
   params: {
     weights: Matrix[];
     biases: Matrix[];
@@ -17,9 +17,7 @@ export type MultiHiddenLayerNetwork = {
   accuracy: number;
 };
 
-export const createMultiHiddenLayerNetwork = (
-  props: CreateMultiHiddenLayerNetworkProps
-): MultiHiddenLayerNetwork => {
+export const createNetwork = (props: CreateNetworkProps): Network => {
   const {
     inputSize: INPUT_SIZE,
     hiddenSizes: HIDDEN_SIZES,
@@ -54,10 +52,7 @@ export const createMultiHiddenLayerNetwork = (
   };
 };
 
-export function multiLayerForwardPropagate(
-  inputs: Matrix,
-  params: MultiHiddenLayerNetwork["params"]
-) {
+export function forwardPropagate(inputs: Matrix, params: Network["params"]) {
   const { weights, biases } = params;
 
   const weightedSumsAndActivations = weights.reduce(
@@ -87,10 +82,10 @@ export function multiLayerForwardPropagate(
   return weightedSumsAndActivations as [Matrix, Matrix][]; // [z, a][]
 }
 
-export function multiLayerBackPropagate(
+export function backPropagate(
   weightedSumsAndActivations: [Matrix, Matrix][],
   expected: Matrix,
-  params: MultiHiddenLayerNetwork["params"]
+  params: Network["params"]
 ) {
   const { weights } = params;
 
@@ -179,8 +174,8 @@ export function multiLayerBackPropagate(
   };
 }
 
-export function multiLayerUpdateParams(
-  params: MultiHiddenLayerNetwork["params"],
+export function step(
+  params: Network["params"],
   dWs: Matrix[],
   dBs: Matrix[],
   learningRate: number
@@ -204,13 +199,10 @@ export function getAccuracy(
     input: number[];
     output: number[];
   }[],
-  params: MultiHiddenLayerNetwork["params"]
+  params: Network["params"]
 ) {
   const correct = test.reduce((acc, { input, output }) => {
-    const weightedSumsAndActivations = multiLayerForwardPropagate(
-      [input],
-      params
-    );
+    const weightedSumsAndActivations = forwardPropagate([input], params);
     const a2 =
       weightedSumsAndActivations[weightedSumsAndActivations.length - 1][1];
     const a2transpose = a2.map((arr) => arr[0]);
@@ -236,10 +228,7 @@ export type GradientDescentParams = {
   }[];
 };
 
-export function multiLayerGradientDescent(
-  model: MultiHiddenLayerNetwork,
-  props: GradientDescentParams
-) {
+export function gradientDescent(model: Network, props: GradientDescentParams) {
   const { learningRate, epochs, trainingData, testData, batchSize } = props;
 
   for (let i = 0; i < epochs; i++) {
@@ -251,17 +240,21 @@ export function multiLayerGradientDescent(
       batches++;
       const batch = trainingData.slice(j, j + batchSize);
       const input = batch.map((d) => d.input);
-      const forward = multiLayerForwardPropagate(input, model.params);
+      const weightedSumsAndActivations = forwardPropagate(input, model.params);
 
       const expected = batch.map((d) => d.output);
-      const backprop = multiLayerBackPropagate(forward, T(expected), {
-        weights: model.params.weights,
-        biases: model.params.biases,
-      });
-      multiLayerUpdateParams(
+      const deltaWeightsAndBiases = backPropagate(
+        weightedSumsAndActivations,
+        T(expected),
+        {
+          weights: model.params.weights,
+          biases: model.params.biases,
+        }
+      );
+      step(
         model.params,
-        backprop.dWs,
-        backprop.dBs,
+        deltaWeightsAndBiases.dWs,
+        deltaWeightsAndBiases.dBs,
         learningRate
       );
     }
