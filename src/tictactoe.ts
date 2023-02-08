@@ -76,7 +76,38 @@ if (command === "train") {
 
   const samples = getRandomSample(test, 10);
 
-  const OUTCOMES = ["X wins", "O wins", "Draw", "Unfinished"];
+  const OUTCOMES = ["X", "O", "Draw", "Unfinished"];
+
+  const printGrid = (grid: number[]) => {
+    // 27 length array, 9 squares, 3 values per square
+    const partition = (arr: number[], size: number) => {
+      const result: ("X" | "O" | ".")[] = [];
+      for (let i = 0; i < arr.length; i += size) {
+        const values = arr.slice(i, i + size);
+        const index = values.indexOf(1);
+        if (index === 0) {
+          result.push("X");
+        } else if (index === 1) {
+          result.push("O");
+        } else {
+          result.push(".");
+        }
+      }
+
+      return result;
+    };
+
+    const squares = partition(grid, 3);
+
+    console.log(
+      `  ${squares[0]} | ${squares[1]} | ${squares[2]}
+ ---+---+---
+  ${squares[3]} | ${squares[4]} | ${squares[5]}
+ ---+---+---
+  ${squares[6]} | ${squares[7]} | ${squares[8]}`
+    );
+    console.log("");
+  };
 
   let correct = 0;
   samples.forEach(({ input, output }) => {
@@ -86,8 +117,22 @@ if (command === "train") {
     const prediction =
       OUTCOMES[lastLayerTranspose.indexOf(Math.max(...lastLayerTranspose))];
     const actual = OUTCOMES[(output as number[]).indexOf(Math.max(...output))];
-    console.log(`Prediction: ${prediction} Actual: ${actual}`);
-    if (prediction === actual) correct++;
+    printGrid(input);
+    console.log(`Prediction: ${prediction} / Actual: ${actual}`);
+    console.log(
+      `Confidences: ${lastLayerTranspose
+        .map((v, i) => `${OUTCOMES[i]}: ${v.toFixed(2)}`)
+        .join(", ")}`
+    );
+    if (prediction === actual) {
+      correct++;
+      console.log("Correct!");
+    } else {
+      console.log("Incorrect!");
+    }
+    console.log("");
+    console.log("------------------------");
+    console.log("");
   });
 
   console.log(`Guessed ${correct} out of ${samples.length} correctly`);
