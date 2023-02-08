@@ -1,15 +1,7 @@
 import { relu, reluDerivative, softmax } from "./activation";
-import {
-  mMul,
-  matrixOf,
-  mSD,
-  mSM,
-  mSub,
-  T,
-  mMap,
-  getShape,
-  mHad,
-} from "./matrix";
+import { mMul, matrixOf, mSD, mSM, mSub, T, mMap, mHad } from "./matrix";
+
+export type Matrix = number[][];
 
 export type CreateMultiHiddenLayerNetworkProps = {
   inputSize: number;
@@ -19,8 +11,8 @@ export type CreateMultiHiddenLayerNetworkProps = {
 
 export type MultiHiddenLayerNetwork = {
   params: {
-    weights: number[][][];
-    biases: number[][][];
+    weights: Matrix[];
+    biases: Matrix[];
   };
   accuracy: number;
 };
@@ -43,7 +35,7 @@ export const createMultiHiddenLayerNetwork = (
       initialValue: () => Math.random() - 0.5,
     });
     return [...acc, weight];
-  }, [] as number[][][]);
+  }, [] as Matrix[]);
 
   const biases = LAYERS.map((layerSize) =>
     matrixOf({
@@ -63,7 +55,7 @@ export const createMultiHiddenLayerNetwork = (
 };
 
 export function multiLayerForwardPropagate(
-  inputs: number[][],
+  inputs: Matrix,
   params: MultiHiddenLayerNetwork["params"]
 ) {
   const { weights, biases } = params;
@@ -89,15 +81,15 @@ export function multiLayerForwardPropagate(
       return [...acc, [z, a]];
     },
     // The input layer activation is just the input
-    [[T(inputs), T(inputs)]] as number[][][][]
+    [[T(inputs), T(inputs)]] as Matrix[][]
   );
 
-  return weightedSumsAndActivations as [number[][], number[][]][]; // [z, a][]
+  return weightedSumsAndActivations as [Matrix, Matrix][]; // [z, a][]
 }
 
 export function multiLayerBackPropagate(
-  weightedSumsAndActivations: [number[][], number[][]][],
-  expected: number[][],
+  weightedSumsAndActivations: [Matrix, Matrix][],
+  expected: Matrix,
   params: MultiHiddenLayerNetwork["params"]
 ) {
   const { weights } = params;
@@ -115,8 +107,8 @@ export function multiLayerBackPropagate(
   // We want to calculate the negative gradient of the cost function with respect to the weights and biases,
   // I.e. the derivative of the cost function with respect to the weights and biases that will reduce the cost function the most.
   // Using these, we can update the weights and biases to reduce the cost function, i.e. reduce how much our network is wrong.
-  const dW: number[][][] = [];
-  const dB: number[][][] = [];
+  const dW: Matrix[] = [];
+  const dB: Matrix[] = [];
 
   // To update the weights, we want to calculate the derivative of the cost function with respect to the weights.
   // Using the chain rule:
@@ -189,8 +181,8 @@ export function multiLayerBackPropagate(
 
 export function multiLayerUpdateParams(
   params: MultiHiddenLayerNetwork["params"],
-  dWs: number[][][],
-  dBs: number[][][],
+  dWs: Matrix[],
+  dBs: Matrix[],
   learningRate: number
 ) {
   const { weights, biases } = params;
