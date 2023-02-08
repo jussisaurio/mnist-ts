@@ -267,7 +267,7 @@ export function multiLayerForwardPropagate(
 
   const outputsAndActivations = weights.reduce(
     (acc, weight, i) => {
-      const [prevZ, prevA] = acc[i];
+      const [_, prevA] = acc[i];
       const z = mMul(weight, prevA).map(
         (row, j) => row.map((v) => v + biases[i][j][0]) // add bias
       );
@@ -435,16 +435,6 @@ export function singleLayerGradientDescent(
         backprop.dB2,
         learningRate
       );
-
-      // every now and then log the accuracy
-      if (batches % 200 === 0) {
-        const accuracy = getAccuracy(
-          getRandomSample(testData, 100),
-          model.params
-        );
-
-        // console.log(`Interim accuracy: ${accuracy}`);
-      }
     }
 
     const accuracy = getAccuracy(getRandomSample(testData, 100), model.params);
@@ -484,16 +474,6 @@ export function multiLayerGradientDescent(
         backprop.dBs,
         learningRate
       );
-
-      // every now and then log the accuracy
-      if (batches % 200 === 0) {
-        const accuracy = getAccuracyMulti(
-          getRandomSample(testData, 100),
-          model.params
-        );
-
-        // console.log(`Interim accuracy: ${accuracy}`);
-      }
     }
 
     const accuracy = getAccuracyMulti(
