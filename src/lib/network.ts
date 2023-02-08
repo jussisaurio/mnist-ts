@@ -112,11 +112,11 @@ export function multiLayerBackPropagate(
   const [__, outputLayerA] =
     outputsAndActivations[outputsAndActivations.length - 1];
 
-  // We want to calculate the derivative of the cost function with respect to the weights and biases,
-  // I.e. how much the cost function changes when we change the weights and biases.
-  // Using these derivatives, we can update the weights and biases to reduce the cost function, i.e. reduce how much our network is wrong.
-  const dW: any[] = [];
-  const dB: any[] = [];
+  // We want to calculate the negative gradient of the cost function with respect to the weights and biases,
+  // I.e. the derivative of the cost function with respect to the weights and biases that will reduce the cost function the most.
+  // Using these, we can update the weights and biases to reduce the cost function, i.e. reduce how much our network is wrong.
+  const dW: number[][][] = [];
+  const dB: number[][][] = [];
 
   // To update the weights, we want to calculate the derivative of the cost function with respect to the weights.
   // Using the chain rule:
