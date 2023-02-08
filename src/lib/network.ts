@@ -68,7 +68,7 @@ export function multiLayerForwardPropagate(
 ) {
   const { weights, biases } = params;
 
-  const outputsAndActivations = weights.reduce(
+  const weightedSumsAndActivations = weights.reduce(
     (acc, weight, i) => {
       const [_, prevA] = acc[i];
       // z = w * a + b
@@ -92,11 +92,11 @@ export function multiLayerForwardPropagate(
     [[T(inputs), T(inputs)]] as number[][][][]
   );
 
-  return outputsAndActivations as [number[][], number[][]][]; // [z, a][]
+  return weightedSumsAndActivations as [number[][], number[][]][]; // [z, a][]
 }
 
 export function multiLayerBackPropagate(
-  outputsAndActivations: [number[][], number[][]][],
+  weightedSumsAndActivations: [number[][], number[][]][],
   expected: number[][],
   params: MultiHiddenLayerNetwork["params"]
 ) {
@@ -104,13 +104,13 @@ export function multiLayerBackPropagate(
 
   const batchSize = expected[0].length;
 
-  const [_, inputLayerA] = outputsAndActivations[0];
-  const hiddenLayers = outputsAndActivations.slice(
+  const A_Input = weightedSumsAndActivations[0][1];
+  const hiddenLayers = weightedSumsAndActivations.slice(
     1,
-    outputsAndActivations.length - 1
+    weightedSumsAndActivations.length - 1
   );
-  const [__, outputLayerA] =
-    outputsAndActivations[outputsAndActivations.length - 1];
+  const A_Output =
+    weightedSumsAndActivations[weightedSumsAndActivations.length - 1][1];
 
   // We want to calculate the negative gradient of the cost function with respect to the weights and biases,
   // I.e. the derivative of the cost function with respect to the weights and biases that will reduce the cost function the most.
@@ -128,14 +128,14 @@ export function multiLayerBackPropagate(
   // is obtained from a complicated calculation (http://www.adeveloperdiary.com/data-science/deep-learning/neural-network-with-softmax-in-python/),
   // but in the end it simplifies to just the difference between the output and the expected output. Trust me bro, it's true.
   // For this reason we don't have to calculate anything except:
-  const dL_dZOutput = mSub(outputLayerA, expected);
-
-  const [___, lastHiddenLayerA] = hiddenLayers[hiddenLayers.length - 1];
+  const dL_dZOutput = mSub(A_Output, expected);
 
   // For dZ_Output/dW_Output, we can expand Z_Output to = W_Output * A_Prev + B_Output
   // So: dZ_Output/dW_Output = A_Prev
+  let A_Prev = hiddenLayers[hiddenLayers.length - 1][1];
+
   // So: dLoss/dW_Output = dLoss/dZ_Output * A_Prev
-  dW.unshift(mSD(mMul(dL_dZOutput, T(lastHiddenLayerA)), batchSize)); // divide by batch size to get the average
+  dW.unshift(mSD(mMul(dL_dZOutput, T(A_Prev)), batchSize)); // divide by batch size to get the average
 
   // dLoss/dB_Output = dLoss/dZ_Output * dZ_Output/dB_Output
   // For dZ_Output/dB_Output, we can expand Z_Output to = W_Output * A_Prev + B_Output
@@ -160,19 +160,20 @@ export function multiLayerBackPropagate(
 
     // For dA_Hidden/dZ_Hidden, we can use the derivative of the activation function.
     // Since A_Hidden = relu(Z_Hidden):
-    // dA_Hidden/dZ_Hidden = relu'(Z_Hidden)
+    // dA_Hidden/dZ_Hidden = relu'(Z_Hidden) // technically it's relu'(Z_Hidden) * 1 because of the chain rule f'(g(x)) * g'(x), but we can ignore the 1
     // So: dLoss/dZ_Hidden = dZNext * W_Next * relu'(Z_Hidden)
     const [Z_Hidden] = hiddenLayers[i];
     const reluDerivZHidden = mMap(Z_Hidden, reluDerivative);
     const dZ_Hidden = mHad(reluDerivZHidden, mMul(T(W_Next), dZNext));
 
     // So: dLoss/dW_Hidden = dLoss/dZ_Hidden * A_Prev
-    const A_Prev = i === 0 ? inputLayerA : hiddenLayers[i - 1][1];
+    A_Prev = i === 0 ? A_Input : hiddenLayers[i - 1][1];
     dW.unshift(mSD(mMul(dZ_Hidden, T(A_Prev)), batchSize)); // divide by batch size to get the average
 
     // dLoss/dB_Hidden = dLoss/dZ_Next * dZ_Next/dA_Hidden * dA_Hidden/dZ_Hidden * dZ_Hidden/dB_Hidden
     // For dZ_Hidden/dB_Hidden, we can expand Z_Hidden to = W_Hidden * A_Prev + B_Hidden
     // So: dZ_Hidden/dB_Hidden = 1
+    // So: dLoss/dB_Hidden = dLoss/dZ_Hidden * 1
 
     dB.unshift(mSD(dZ_Hidden, batchSize)); // divide by batch size to get the average
 
@@ -214,8 +215,12 @@ export function getAccuracy(
   params: MultiHiddenLayerNetwork["params"]
 ) {
   const correct = test.reduce((acc, { input, output }) => {
-    const outputsAndActivations = multiLayerForwardPropagate([input], params);
-    const a2 = outputsAndActivations[outputsAndActivations.length - 1][1];
+    const weightedSumsAndActivations = multiLayerForwardPropagate(
+      [input],
+      params
+    );
+    const a2 =
+      weightedSumsAndActivations[weightedSumsAndActivations.length - 1][1];
     const a2transpose = a2.map((arr) => arr[0]);
     const prediction = a2transpose.indexOf(Math.max(...a2transpose));
     const actual = output.indexOf(Math.max(...output));
