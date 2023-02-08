@@ -1,13 +1,15 @@
-import { mnistTestSet, mnistTrainingSet } from "./dataset/parseDataset";
-
-import * as fs from "fs";
-import { matrixMultiply, matrixTranspose } from "./matrix";
 import { relu, reluDerivative, softmax } from "./activation";
+import {
+  getShape,
+  matrixMultiply,
+  matrixOf,
+  matrixScalarMultiply,
+  matrixSubtract,
+  matrixTranspose,
+} from "./matrix";
+import { getRandomSample } from "./util";
 
-const train = mnistTrainingSet;
-const test = mnistTestSet;
-
-type Network = {
+export type SingleHiddenLayerNetwork = {
   params: {
     weights1: number[][]; // [HIDDEN_SIZE, INPUT_SIZE]
     weights2: number[][]; // [OUTPUT_SIZE, HIDDEN_SIZE]
@@ -17,23 +19,20 @@ type Network = {
   accuracy: number;
 };
 
-const matrixOf = ({
-  rows,
-  cols,
-  initialValue,
-}: {
-  rows: number;
-  cols: number;
-  initialValue: () => number;
-}) =>
-  Array(rows)
-    .fill(0)
-    .map(() => Array(cols).fill(0).map(initialValue));
+export type SingleHiddenLayerNetworkProps = {
+  inputSize: number;
+  hiddenSize: number;
+  outputSize: number;
+};
 
-function createNetwork(): Network {
-  const INPUT_SIZE = 784;
-  const HIDDEN_SIZE = 16;
-  const OUTPUT_SIZE = 10;
+export function createSingleHiddenLayerNetwork(
+  props: SingleHiddenLayerNetworkProps
+): SingleHiddenLayerNetwork {
+  const {
+    inputSize: INPUT_SIZE,
+    hiddenSize: HIDDEN_SIZE,
+    outputSize: OUTPUT_SIZE,
+  } = props;
 
   const weights1 = matrixOf({
     rows: HIDDEN_SIZE,
@@ -70,7 +69,10 @@ function createNetwork(): Network {
   };
 }
 
-function forwardPropagate(input: number[][], params: Network["params"]) {
+export function singleLayerForwardPropagate(
+  input: number[][],
+  params: SingleHiddenLayerNetwork["params"]
+) {
   const { weights1, weights2, biases1, biases2 } = params;
 
   // weights1 matrix dimensions (rows, cols) are [HIDDEN_SIZE, INPUT_SIZE]
@@ -109,13 +111,15 @@ function forwardPropagate(input: number[][], params: Network["params"]) {
   };
 }
 
-type BackpropParams = ReturnType<typeof forwardPropagate> & {
+export type SingleLayerBackpropParams = ReturnType<
+  typeof singleLayerForwardPropagate
+> & {
   weights2: number[][];
   input: number[][];
   expected: number[][];
 };
 
-function backPropagate(params: BackpropParams) {
+export function singleLayerBackpropagate(params: SingleLayerBackpropParams) {
   const { a1, a2, z1, input, weights2: w2, expected } = params;
 
   // expected is the expected output of the network (dimensions: [SAMPLE_SIZE, OUTPUT_SIZE])
@@ -182,14 +186,15 @@ function backPropagate(params: BackpropParams) {
   };
 }
 
-function updateWeightsAndBiases(
-  params: Network["params"],
-  dW1: Network["params"]["weights1"],
-  dW2: Network["params"]["weights2"],
-  dB1: Network["params"]["biases1"],
-  dB2: Network["params"]["biases2"],
+export function singleLayerUpdateWeightsAndBiases(
+  network: SingleHiddenLayerNetwork,
+  dW1: SingleHiddenLayerNetwork["params"]["weights1"],
+  dW2: SingleHiddenLayerNetwork["params"]["weights2"],
+  dB1: SingleHiddenLayerNetwork["params"]["biases1"],
+  dB2: SingleHiddenLayerNetwork["params"]["biases2"],
   learningRate: number
 ): void {
+  const { params } = network;
   const { weights1, weights2, biases1, biases2 } = params;
 
   const newWeights1 = weights1.map((arr, i) =>
@@ -207,15 +212,168 @@ function updateWeightsAndBiases(
   params.biases2 = newBiases2;
 }
 
-function getAccuracy(
+export type CreateMultiHiddenLayerNetworkProps = {
+  inputSize: number;
+  hiddenSizes: number[];
+  outputSize: number;
+};
+
+export type MultiHiddenLayerNetwork = {
+  params: {
+    weights: number[][][];
+    biases: number[][][];
+  };
+  accuracy: number;
+};
+
+export const createMultiHiddenLayerNetwork = (
+  props: CreateMultiHiddenLayerNetworkProps
+): MultiHiddenLayerNetwork => {
+  const {
+    inputSize: INPUT_SIZE,
+    hiddenSizes: HIDDEN_SIZES,
+    outputSize: OUTPUT_SIZE,
+  } = props;
+
+  const LAYERS = [...HIDDEN_SIZES, OUTPUT_SIZE];
+  const weights = LAYERS.reduce((acc, layerSize, i) => {
+    const prevSize = i === 0 ? INPUT_SIZE : LAYERS[i - 1];
+    const weight = matrixOf({
+      rows: layerSize,
+      cols: prevSize,
+      initialValue: () => Math.random() - 0.5,
+    });
+    return [...acc, weight];
+  }, [] as number[][][]);
+
+  const biases = LAYERS.map((layerSize) =>
+    matrixOf({
+      rows: layerSize,
+      cols: 1,
+      initialValue: () => Math.random() * 2 - 1,
+    })
+  );
+
+  return {
+    params: {
+      weights,
+      biases,
+    },
+    accuracy: 0,
+  };
+};
+
+export function multiLayerForwardPropagate(
+  inputs: number[][],
+  params: MultiHiddenLayerNetwork["params"]
+) {
+  const { weights, biases } = params;
+
+  // inputs is the input layer
+  // hidden layer count depends on the number of weights
+
+  const outputsAndActivations = weights.reduce(
+    (acc, weight, i) => {
+      const [prevZ, prevA] = acc[i];
+      const z = matrixMultiply(weight, prevA).map(
+        (row, j) => row.map((v) => v + biases[i][j][0]) // add bias
+      );
+
+      const isOutputLayer = i === weights.length - 1;
+      const a = (() => {
+        if (isOutputLayer) {
+          const zTranspose = matrixTranspose(z);
+          return matrixTranspose(zTranspose.map(softmax));
+        }
+        return z.map((row) => row.map((v) => relu(v)));
+      })();
+      return [...acc, [z, a]];
+    },
+    [[matrixTranspose(inputs), matrixTranspose(inputs)]] as number[][][][]
+  );
+
+  return outputsAndActivations as [number[][], number[][]][]; // [z, a][]
+}
+
+export function multiLayerBackPropagate(
+  outputsAndActivations: [number[][], number[][]][],
+  targets: number[][],
+  params: MultiHiddenLayerNetwork["params"]
+) {
+  const { weights } = params;
+
+  // for (const [z, a] of outputsAndActivations) {
+  //   console.log("Z shape", getShape(z));
+  //   console.log("A shape", getShape(a));
+  // }
+
+  const dL_dZs = outputsAndActivations.reduceRight((acc, [z, a], i, arr) => {
+    const prevDl_dZ = acc[0];
+    const isOutputLayer = i === arr.length - 1;
+    const dL_dZ = (() => {
+      if (isOutputLayer) {
+        return matrixSubtract(a, targets);
+      }
+      const prevWeight = weights[i];
+      const prevDl_dZTranspose = matrixTranspose(prevDl_dZ);
+      const prevWeightTranspose = matrixTranspose(prevWeight);
+      const prevZTranspose = matrixTranspose(z);
+      const dZ_dA = prevZTranspose.map((row) =>
+        row.map((v) => (v > 0 ? 1 : 0))
+      );
+      const dL_dA = matrixMultiply(prevWeightTranspose, prevDl_dZTranspose);
+      return matrixMultiply(dL_dA, dZ_dA);
+    })();
+    return [dL_dZ, ...acc];
+  }, [] as number[][][]);
+
+  const dL_dWs = dL_dZs.reduce((acc, dL_dZ, i) => {
+    const prevA = outputsAndActivations[i][1];
+    const dL_dW = matrixMultiply(dL_dZ, matrixTranspose(prevA)).map(
+      (row) => row.map((v) => v / prevA[0].length) // divide by sample size to get the average
+    );
+    return [...acc, dL_dW];
+  }, [] as number[][][]);
+
+  const dL_dBs = dL_dZs.map((dL_dZ) =>
+    dL_dZ.map((row) => [row.reduce((acc, v) => acc + v, 0)])
+  );
+
+  return {
+    dWs: dL_dWs,
+    dBs: dL_dBs,
+  };
+}
+
+export function multiLayerUpdateParams(
+  params: MultiHiddenLayerNetwork["params"],
+  dWs: number[][][],
+  dBs: number[][][],
+  learningRate: number
+) {
+  const { weights, biases } = params;
+
+  const newWeights = weights.map((weight, i) =>
+    matrixSubtract(weight, matrixScalarMultiply(dWs[i], learningRate))
+  );
+
+  const newBiases = biases.map((bias, i) =>
+    matrixSubtract(bias, matrixScalarMultiply(dBs[i], learningRate))
+  );
+
+  params.weights = newWeights;
+  params.biases = newBiases;
+}
+
+export function getAccuracy(
   test: {
     input: number[];
     output: number[];
   }[],
-  params: Network["params"]
+  params: SingleHiddenLayerNetwork["params"]
 ) {
   const correct = test.reduce((acc, { input, output }) => {
-    const { a2 } = forwardPropagate([input], params);
+    const { a2 } = singleLayerForwardPropagate([input], params);
     const a2transpose = a2.map((arr) => arr[0]);
     const prediction = a2transpose.indexOf(Math.max(...a2transpose));
     const actual = output.indexOf(Math.max(...output));
@@ -225,7 +383,26 @@ function getAccuracy(
   return correct / test.length;
 }
 
-type GradientDescentParams = {
+export function getAccuracyMulti(
+  test: {
+    input: number[];
+    output: number[];
+  }[],
+  params: MultiHiddenLayerNetwork["params"]
+) {
+  const correct = test.reduce((acc, { input, output }) => {
+    const outputsAndActivations = multiLayerForwardPropagate([input], params);
+    const a2 = outputsAndActivations[outputsAndActivations.length - 1][1];
+    const a2transpose = a2.map((arr) => arr[0]);
+    const prediction = a2transpose.indexOf(Math.max(...a2transpose));
+    const actual = output.indexOf(Math.max(...output));
+    return prediction === actual ? acc + 1 : acc;
+  }, 0);
+
+  return correct / test.length;
+}
+
+export type GradientDescentParams = {
   learningRate: number;
   epochs: number;
   batchSize: number;
@@ -239,21 +416,10 @@ type GradientDescentParams = {
   }[];
 };
 
-function getRandomSample<T extends any>(arr: T[], size: number) {
-  const sample = [];
-  for (let i = 0; i < size; i++) {
-    const index = Math.floor(Math.random() * arr.length);
-    sample.push(arr[index]);
-  }
-  return sample;
-}
-
-function gradientDescent(props: GradientDescentParams) {
-  const model = process.env.USE_EXISTING
-    ? (JSON.parse(fs.readFileSync("src/model.json", "utf8")) as ReturnType<
-        typeof createNetwork
-      >)
-    : createNetwork();
+export function singleLayerGradientDescent(
+  model: SingleHiddenLayerNetwork,
+  props: GradientDescentParams
+) {
   const { learningRate, epochs, trainingData, testData, batchSize } = props;
 
   for (let i = 0; i < epochs; i++) {
@@ -263,17 +429,17 @@ function gradientDescent(props: GradientDescentParams) {
       batches++;
       const batch = trainingData.slice(j, j + batchSize);
       const input = batch.map((d) => d.input);
-      const forward = forwardPropagate(input, model.params);
+      const forward = singleLayerForwardPropagate(input, model.params);
 
       const expected = batch.map((d) => d.output);
-      const backprop = backPropagate({
+      const backprop = singleLayerBackpropagate({
         ...forward,
         input: matrixTranspose(input),
         expected: matrixTranspose(expected),
         weights2: model.params.weights2,
       });
-      updateWeightsAndBiases(
-        model.params,
+      singleLayerUpdateWeightsAndBiases(
+        model,
         backprop.dW1,
         backprop.dW2,
         backprop.dB1,
@@ -303,59 +469,58 @@ function gradientDescent(props: GradientDescentParams) {
   };
 }
 
-const command = process.argv[2];
+export function multiLayerGradientDescent(
+  model: MultiHiddenLayerNetwork,
+  props: GradientDescentParams
+) {
+  const { learningRate, epochs, trainingData, testData, batchSize } = props;
 
-if (command === "train") {
-  const epochs = parseInt(process.argv[3], 10) || 10;
-  const learningRate = parseFloat(process.argv[4]) || 0.01;
-  const batchSize = parseInt(process.argv[5], 10) || 10;
-  const finishedModel = gradientDescent({
-    learningRate,
-    epochs,
-    trainingData: train,
-    testData: test,
-    batchSize,
-  });
+  for (let i = 0; i < epochs; i++) {
+    console.log(`Epoch ${i + 1} started, batch size: ${batchSize}`);
+    let batches = 0;
+    for (let j = 0; j < trainingData.length; j += batchSize) {
+      batches++;
+      const batch = trainingData.slice(j, j + batchSize);
+      const input = batch.map((d) => d.input);
+      const forward = multiLayerForwardPropagate(input, model.params);
 
-  const existingModel = (() => {
-    try {
-      return JSON.parse(fs.readFileSync("src/model.json", "utf8"));
-    } catch (e) {
-      return null;
+      const expected = batch.map((d) => d.output);
+      const backprop = multiLayerBackPropagate(
+        forward,
+        matrixTranspose(expected),
+        {
+          weights: model.params.weights,
+          biases: model.params.biases,
+        }
+      );
+      multiLayerUpdateParams(
+        model.params,
+        backprop.dWs,
+        backprop.dBs,
+        learningRate
+      );
+
+      // every now and then log the accuracy
+      if (batches % 200 === 0) {
+        const accuracy = getAccuracyMulti(
+          getRandomSample(testData, 100),
+          model.params
+        );
+
+        // console.log(`Interim accuracy: ${accuracy}`);
+      }
     }
-  })();
 
-  if (existingModel && existingModel.accuracy > finishedModel.accuracy) {
-    console.log(
-      "Accuracy is: " +
-        finishedModel.accuracy +
-        ". Existing model is better with accuracy " +
-        existingModel.accuracy
+    const accuracy = getAccuracyMulti(
+      getRandomSample(testData, 100),
+      model.params
     );
-    process.exit(0);
+
+    console.log(`Epoch ${i + 1} accuracy: ${accuracy}`);
   }
 
-  fs.writeFileSync("src/model.json", JSON.stringify(finishedModel));
-
-  console.log("New model saved with accuracy " + finishedModel.accuracy);
-} else if (command === "test") {
-  const model = JSON.parse(fs.readFileSync("src/model.json", "utf8"));
-
-  if (!model) throw new Error("No model found. Please train a model first");
-
-  const samples = getRandomSample(test, 10);
-
-  let correct = 0;
-  samples.forEach(({ input, output }) => {
-    const { a2 } = forwardPropagate([input], model.params);
-    const a2transpose = a2.map((arr) => arr[0]);
-    const prediction = a2transpose.indexOf(Math.max(...a2transpose));
-    const actual = (output as number[]).indexOf(Math.max(...output));
-    console.log(`Prediction: ${prediction} Actual: ${actual}`);
-    if (prediction === actual) correct++;
-  });
-
-  console.log(`Guessed ${correct} out of ${samples.length} correctly`);
-} else {
-  console.log("Usage: npm run train <epochs> <learningRate> | npm run test");
+  return {
+    ...model,
+    accuracy: getAccuracyMulti(testData, model.params),
+  };
 }

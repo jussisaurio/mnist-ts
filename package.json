@@ -17,7 +17,9 @@
     "build": "tsc",
     "lint": "tslint -c tslint.json src/**/*.ts",
     "prepublish": "npm run build",
-    "train": "ts-node src/index.ts train",
-    "test": "ts-node src/index.ts test"
+    "mnist:train": "ts-node src/mnist.ts train",
+    "mnist:test": "ts-node src/mnist.ts test",
+    "tictactoe:train": "ts-node src/tictactoe.ts train",
+    "tictactoe:test": "ts-node src/tictactoe.ts test"
   }
 }

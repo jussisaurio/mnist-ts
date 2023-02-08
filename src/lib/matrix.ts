@@ -69,3 +69,32 @@ export const matrixSubtract = (a: number[][], b: number[][]) => {
 
   return result;
 };
+
+export const matrixScalarMultiply = (a: number[][], b: number) => {
+  const result: number[][] = [];
+
+  for (let i = 0; i < a.length; i++) {
+    result[i] = [];
+
+    for (let j = 0; j < a[0].length; j++) {
+      result[i][j] = a[i][j] * b;
+    }
+  }
+
+  return result;
+};
+
+export const matrixOf = ({
+  rows,
+  cols,
+  initialValue = () => 0,
+}: {
+  rows: number;
+  cols: number;
+  initialValue: () => number;
+}) =>
+  Array(rows)
+    .fill(0)
+    .map(() => Array(cols).fill(0).map(initialValue));
+
+export const getShape = (a: number[][]) => [a.length, a[0].length];
