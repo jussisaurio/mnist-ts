@@ -2,10 +2,10 @@ import { mnistTestSet, mnistTrainingSet } from "./dataset/parseDataset";
 
 import * as fs from "fs";
 import {
-  createSingleHiddenLayerNetwork,
-  singleLayerForwardPropagate,
-  singleLayerGradientDescent,
-  SingleHiddenLayerNetwork,
+  MultiHiddenLayerNetwork,
+  createMultiHiddenLayerNetwork,
+  multiLayerGradientDescent,
+  multiLayerForwardPropagate,
 } from "./lib/network";
 import { getRandomSample } from "./lib/util";
 
@@ -22,13 +22,13 @@ if (command === "train") {
   const model = process.env.USE_EXISTING
     ? (JSON.parse(
         fs.readFileSync("src/mnist-model.json", "utf8")
-      ) as SingleHiddenLayerNetwork)
-    : createSingleHiddenLayerNetwork({
+      ) as MultiHiddenLayerNetwork)
+    : createMultiHiddenLayerNetwork({
         inputSize: 784,
-        hiddenSize: 16,
+        hiddenSizes: [16, 16, 16],
         outputSize: 10,
       });
-  const finishedModel = singleLayerGradientDescent(model, {
+  const finishedModel = multiLayerGradientDescent(model, {
     learningRate,
     epochs,
     trainingData: train,
@@ -66,7 +66,8 @@ if (command === "train") {
 
   let correct = 0;
   samples.forEach(({ input, output }) => {
-    const { a2 } = singleLayerForwardPropagate([input], model.params);
+    const forward = multiLayerForwardPropagate([input], model.params);
+    const a2 = forward[forward.length - 1][1];
     const a2transpose = a2.map((arr) => arr[0]);
     const prediction = a2transpose.indexOf(Math.max(...a2transpose));
     const actual = (output as number[]).indexOf(Math.max(...output));
