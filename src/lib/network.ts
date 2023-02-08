@@ -124,7 +124,7 @@ export function multiLayerBackPropagate(
   //
   // About calculating dLoss/dZ_Output:
   // We are implicitly using Cross-Entropy loss here.
-  // When using softmax, the derivative of the C-E loss function with respect to the output layer's weighted sum, z,
+  // When using softmax, the derivative of the C-E loss function with respect to the output layer's weighted sum, Z_Output,
   // is obtained from a complicated calculation (http://www.adeveloperdiary.com/data-science/deep-learning/neural-network-with-softmax-in-python/),
   // but in the end it simplifies to just the difference between the output and the expected output. Trust me bro, it's true.
   // For this reason we don't have to calculate anything except:
