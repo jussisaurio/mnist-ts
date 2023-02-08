@@ -7,6 +7,7 @@ import {
   MultiHiddenLayerNetwork,
   createMultiHiddenLayerNetwork,
   multiLayerGradientDescent,
+  multiLayerForwardPropagate,
 } from "./lib/network";
 import { getRandomSample } from "./lib/util";
 
@@ -85,9 +86,11 @@ if (command === "train") {
 
   let correct = 0;
   samples.forEach(({ input, output }) => {
-    const { a2 } = singleLayerForwardPropagate([input], model.params);
-    const a2transpose = a2.map((arr) => arr[0]);
-    const prediction = OUTCOMES[a2transpose.indexOf(Math.max(...a2transpose))];
+    const forward = multiLayerForwardPropagate([input], model.params);
+    const lastLayerA = forward[forward.length - 1][1];
+    const lastLayerTranspose = lastLayerA.map((arr) => arr[0]);
+    const prediction =
+      OUTCOMES[lastLayerTranspose.indexOf(Math.max(...lastLayerTranspose))];
     const actual = OUTCOMES[(output as number[]).indexOf(Math.max(...output))];
     console.log(`Prediction: ${prediction} Actual: ${actual}`);
     if (prediction === actual) correct++;

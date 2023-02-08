@@ -1,12 +1,5 @@
 import { relu, reluDerivative, softmax } from "./activation";
-import {
-  getShape,
-  matrixMultiply,
-  matrixOf,
-  matrixScalarMultiply,
-  matrixSubtract,
-  matrixTranspose,
-} from "./matrix";
+import { getShape, mMul, matrixOf, mSD, mSM, mSub, T } from "./matrix";
 import { getRandomSample } from "./util";
 
 export type SingleHiddenLayerNetwork = {
@@ -80,8 +73,8 @@ export function singleLayerForwardPropagate(
   // in matmul, the dimensions of the result are multiplier's rows and multiplicand's cols,
   // so the dimensions of z1 are [HIDDEN_SIZE, SAMPLE_SIZE], which is what we expect:
   // each hidden node has a single output for each sample
-  const samples = matrixTranspose(input);
-  const z1 = matrixMultiply(weights1, samples).map((arr, i) =>
+  const samples = T(input);
+  const z1 = mMul(weights1, samples).map((arr, i) =>
     arr.map((v) => v + biases1[i][0])
   );
 
@@ -94,14 +87,14 @@ export function singleLayerForwardPropagate(
   // in matmul, the dimensions of the result are multiplier's rows and multiplicand's cols,
   // so the dimensions of z2 are [OUTPUT_SIZE, SAMPLE_SIZE], which is what we expect:
   // each output node has a single output for each sample
-  const z2 = matrixMultiply(weights2, a1).map((arr, i) =>
+  const z2 = mMul(weights2, a1).map((arr, i) =>
     arr.map((v) => v + biases2[i][0])
   );
 
   // run the output layer through the activation function to get some nonlinearity up in this motha
   // the sum of the softmax values should be 1, so we can use it as a probability distribution
-  const z2Transposed = matrixTranspose(z2);
-  const a2 = matrixTranspose(z2Transposed.map(softmax));
+  const z2Transposed = T(z2);
+  const a2 = T(z2Transposed.map(softmax));
 
   return {
     a1,
@@ -145,7 +138,7 @@ export function singleLayerBackpropagate(params: SingleLayerBackpropParams) {
   // dL/dW2 = dL/dZ2 * dZ2/dW2
   //        = dl/dZ2 * d/dW2(a1 * w2 + b2)
   //        = dl/dZ2 * a1
-  const dL_dW2 = matrixMultiply(dL_dZ2, matrixTranspose(a1)).map(
+  const dL_dW2 = mMul(dL_dZ2, T(a1)).map(
     (row) => row.map((v) => v / a1[0].length) // divide by the sample size to get the average
   );
 
@@ -160,7 +153,7 @@ export function singleLayerBackpropagate(params: SingleLayerBackpropParams) {
   //        = dL/dZ2 * d/dA1 (a1 * w2 + b2) * d/dZ1 (relu(z1))
   //        = dL/dZ2 * w2 * relu'(z1) * 1
   //        = dL/dZ2 * w2 * relu'(z1)
-  const dL_dZ1 = matrixMultiply(matrixTranspose(w2), dL_dZ2).map((arr, i) =>
+  const dL_dZ1 = mMul(T(w2), dL_dZ2).map((arr, i) =>
     arr.map((v) => v * reluDerivative(z1[i][0]))
   );
 
@@ -168,7 +161,7 @@ export function singleLayerBackpropagate(params: SingleLayerBackpropParams) {
   // dL/dW1 = dL/dZ1 * dZ1/dW1
   //        = dL/dZ1 * d/dW1(a0 * w1 + b1)
   //        = dL/dZ1 * a0
-  const dL_dW1 = matrixMultiply(dL_dZ1, matrixTranspose(a0)).map(
+  const dL_dW1 = mMul(dL_dZ1, T(a0)).map(
     (row) => row.map((v) => v / a0[0].length) // divide by sample size to get the average
   );
 
@@ -275,21 +268,21 @@ export function multiLayerForwardPropagate(
   const outputsAndActivations = weights.reduce(
     (acc, weight, i) => {
       const [prevZ, prevA] = acc[i];
-      const z = matrixMultiply(weight, prevA).map(
+      const z = mMul(weight, prevA).map(
         (row, j) => row.map((v) => v + biases[i][j][0]) // add bias
       );
 
       const isOutputLayer = i === weights.length - 1;
       const a = (() => {
         if (isOutputLayer) {
-          const zTranspose = matrixTranspose(z);
-          return matrixTranspose(zTranspose.map(softmax));
+          const zTranspose = T(z);
+          return T(zTranspose.map(softmax));
         }
-        return z.map((row) => row.map((v) => relu(v)));
+        return z.map((row) => row.map(relu));
       })();
       return [...acc, [z, a]];
     },
-    [[matrixTranspose(inputs), matrixTranspose(inputs)]] as number[][][][]
+    [[T(inputs), T(inputs)]] as number[][][][]
   );
 
   return outputsAndActivations as [number[][], number[][]][]; // [z, a][]
@@ -297,51 +290,50 @@ export function multiLayerForwardPropagate(
 
 export function multiLayerBackPropagate(
   outputsAndActivations: [number[][], number[][]][],
-  targets: number[][],
+  expected: number[][],
   params: MultiHiddenLayerNetwork["params"]
 ) {
   const { weights } = params;
 
-  // for (const [z, a] of outputsAndActivations) {
-  //   console.log("Z shape", getShape(z));
-  //   console.log("A shape", getShape(a));
-  // }
+  const batchSize = expected[0].length;
 
-  const dL_dZs = outputsAndActivations.reduceRight((acc, [z, a], i, arr) => {
-    const prevDl_dZ = acc[0];
-    const isOutputLayer = i === arr.length - 1;
-    const dL_dZ = (() => {
-      if (isOutputLayer) {
-        return matrixSubtract(a, targets);
-      }
-      const prevWeight = weights[i];
-      const prevDl_dZTranspose = matrixTranspose(prevDl_dZ);
-      const prevWeightTranspose = matrixTranspose(prevWeight);
-      const prevZTranspose = matrixTranspose(z);
-      const dZ_dA = prevZTranspose.map((row) =>
-        row.map((v) => (v > 0 ? 1 : 0))
-      );
-      const dL_dA = matrixMultiply(prevWeightTranspose, prevDl_dZTranspose);
-      return matrixMultiply(dL_dA, dZ_dA);
-    })();
-    return [dL_dZ, ...acc];
-  }, [] as number[][][]);
-
-  const dL_dWs = dL_dZs.reduce((acc, dL_dZ, i) => {
-    const prevA = outputsAndActivations[i][1];
-    const dL_dW = matrixMultiply(dL_dZ, matrixTranspose(prevA)).map(
-      (row) => row.map((v) => v / prevA[0].length) // divide by sample size to get the average
-    );
-    return [...acc, dL_dW];
-  }, [] as number[][][]);
-
-  const dL_dBs = dL_dZs.map((dL_dZ) =>
-    dL_dZ.map((row) => [row.reduce((acc, v) => acc + v, 0)])
+  const [inputLayerZ, inputLayerA] = outputsAndActivations[0];
+  const hiddenLayers = outputsAndActivations.slice(
+    1,
+    outputsAndActivations.length - 1
   );
+  const [outputLayerZ, outputLayerA] =
+    outputsAndActivations[outputsAndActivations.length - 1];
+
+  const outputLayerWeights = weights[weights.length - 1];
+
+  const dW: any[] = [];
+  const dB: any[] = [];
+
+  const dZOutput = mSub(outputLayerA, expected);
+
+  const [lastHiddenLayerZ, lastHiddenLayerA] =
+    hiddenLayers[hiddenLayers.length - 1];
+
+  dW.unshift(mSD(mMul(dZOutput, T(lastHiddenLayerA)), batchSize));
+  dB.unshift(mSD(dZOutput, batchSize));
+
+  let dZPrev = dZOutput;
+  for (let i = hiddenLayers.length - 1; i >= 0; i--) {
+    const [hiddenZ, hiddenA] = hiddenLayers[i];
+    const nextWeights = T(weights[i + 1]);
+    const dZ = mMul(nextWeights, dZPrev).map((row, j, self) => {
+      return row.map((v, k) => v * reluDerivative(hiddenZ[j][k]));
+    });
+    const prevA = i === 0 ? inputLayerA : hiddenLayers[i - 1][1];
+    dW.unshift(mSD(mMul(dZ, T(prevA)), batchSize));
+    dB.unshift(mSD(dZ, batchSize));
+    dZPrev = dZ;
+  }
 
   return {
-    dWs: dL_dWs,
-    dBs: dL_dBs,
+    dWs: dW,
+    dBs: dB,
   };
 }
 
@@ -354,11 +346,11 @@ export function multiLayerUpdateParams(
   const { weights, biases } = params;
 
   const newWeights = weights.map((weight, i) =>
-    matrixSubtract(weight, matrixScalarMultiply(dWs[i], learningRate))
+    mSub(weight, mSM(dWs[i], learningRate))
   );
 
   const newBiases = biases.map((bias, i) =>
-    matrixSubtract(bias, matrixScalarMultiply(dBs[i], learningRate))
+    mSub(bias, mSM(dBs[i], learningRate))
   );
 
   params.weights = newWeights;
@@ -434,8 +426,8 @@ export function singleLayerGradientDescent(
       const expected = batch.map((d) => d.output);
       const backprop = singleLayerBackpropagate({
         ...forward,
-        input: matrixTranspose(input),
-        expected: matrixTranspose(expected),
+        input: T(input),
+        expected: T(expected),
         weights2: model.params.weights2,
       });
       singleLayerUpdateWeightsAndBiases(
@@ -485,14 +477,10 @@ export function multiLayerGradientDescent(
       const forward = multiLayerForwardPropagate(input, model.params);
 
       const expected = batch.map((d) => d.output);
-      const backprop = multiLayerBackPropagate(
-        forward,
-        matrixTranspose(expected),
-        {
-          weights: model.params.weights,
-          biases: model.params.biases,
-        }
-      );
+      const backprop = multiLayerBackPropagate(forward, T(expected), {
+        weights: model.params.weights,
+        biases: model.params.biases,
+      });
       multiLayerUpdateParams(
         model.params,
         backprop.dWs,

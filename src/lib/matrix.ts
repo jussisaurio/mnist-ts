@@ -42,6 +42,8 @@ export const matrixMultiply = (a: number[][], b: number[][]) => {
   return result;
 };
 
+export const mMul = matrixMultiply;
+
 export const matrixTranspose = (a: number[][]) => {
   const result: number[][] = [];
 
@@ -55,6 +57,8 @@ export const matrixTranspose = (a: number[][]) => {
 
   return result;
 };
+
+export const T = matrixTranspose;
 
 export const matrixSubtract = (a: number[][], b: number[][]) => {
   const result: number[][] = [];
@@ -70,6 +74,8 @@ export const matrixSubtract = (a: number[][], b: number[][]) => {
   return result;
 };
 
+export const mSub = matrixSubtract;
+
 export const matrixScalarMultiply = (a: number[][], b: number) => {
   const result: number[][] = [];
 
@@ -83,6 +89,24 @@ export const matrixScalarMultiply = (a: number[][], b: number) => {
 
   return result;
 };
+
+export const mSM = matrixScalarMultiply;
+
+export const matrixScalarDivide = (a: number[][], b: number) => {
+  const result: number[][] = [];
+
+  for (let i = 0; i < a.length; i++) {
+    result[i] = [];
+
+    for (let j = 0; j < a[0].length; j++) {
+      result[i][j] = a[i][j] / b;
+    }
+  }
+
+  return result;
+};
+
+export const mSD = matrixScalarDivide;
 
 export const matrixOf = ({
   rows,
